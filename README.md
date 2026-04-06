@@ -40,4 +40,6 @@ the next generation of student athletes. Not just one Rudy.
 Thousands of them. Every year.
 
 ---
-*Founded by Kobie Roberts & Haran Jackson*
+## Team
+**Kobie Roberts** — Co-Founder & Full Stack Developer  
+**Haran Jackson** — Co-Founder
