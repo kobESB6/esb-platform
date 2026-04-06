@@ -1,0 +1,32 @@
+# Virtual Environment — never commit this
+venv/
+path/to/venv/
+env/
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Data files with user info
+data/users.json
+data/coaches.json
+*.json
+
+# VS Code settings
+.vscode/
+
+# Mac system files
+.DS_Store
+
+# Node modules if any
+node_modules/
+
+# Streamlit cache
+.streamlit/
+
+# Sensitive config
+secrets.toml
+.env

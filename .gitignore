@@ -1,1 +1,36 @@
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+path/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Node
+node_modules/
+
+# OS
 .DS_Store
+
+# VS Code
+.vscode/
+
+# Streamlit
+.streamlit/
+
+# Old project folder
+frontend/ESB 1st Project/
+frontend/.venv/
+frontend/path/
+
+# Data files
+frontend/data/
+backend/data/
+
+# Env files
+.env
+secrets.toml
