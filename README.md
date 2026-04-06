@@ -35,9 +35,8 @@ and position themselves to win.
 - **Database:** PostgreSQL (coming)
 
 ## Vision
-A global ecosystem where every success story inspires 
-the next generation of student athletes. Not just one Rudy. 
-Thousands of them. Every year.
+We are building more than a platform. We are building a living legacy — a global community where the overlooked become the celebrated, where ex-athletes pass their wisdom forward, and where every student athlete who did everything right finally gets their moment. Not just one. Thousands of them. Every sport. Every background. Generation after generation.
+
 
 ---
 ## Team
