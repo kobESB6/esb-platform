@@ -15,6 +15,10 @@ app.get("/", (req, res) => {
 const coachRoutes = require("./routes/coaches");
 app.use("/api/coaches", coachRoutes);
 
+// Mount athlete routes — any request to /api/athletes gets handled here
+const athleteRoutes = require("./routes/athletes");
+app.use("/api/athletes", athleteRoutes);
+
 // Start the server
 app.listen(3000, () => {
   console.log("Server running on port 3000");
