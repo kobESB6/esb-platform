@@ -1,5 +1,7 @@
 import streamlit as st
 
+from utils.sidebar import show_sidebar
+
 # === TEST MODE SETUP ===
 TEST_MODE = True
 TEST_ROLE = "athlete"  # Change if you're testing different roles

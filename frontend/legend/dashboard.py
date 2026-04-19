@@ -1,5 +1,8 @@
 import streamlit as st
 
+from utils.sidebar import show_sidebar
+
+
 # ⬇ Add the test session setup here
 TEST_MODE = True
 TEST_ROLE = "legend"
