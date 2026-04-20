@@ -2,6 +2,9 @@ import streamlit as st
 import os
 import json
 
+from utils.sidebar import hide_default_nav
+hide_default_nav()
+
 st.set_page_config(page_title="Eat Sleep Breathe Sports", layout="centered")
 
 # -- Load users from file --
