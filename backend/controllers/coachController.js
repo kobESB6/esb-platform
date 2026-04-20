@@ -23,16 +23,74 @@ function writeCoaches(coaches) {
 }
 
 // ─────────────────────────────────────────
+// OOP — Base Coach Class
+// ─────────────────────────────────────────
+class Coach {
+  constructor(data, hashedPassword) {
+    this.id = uuidv4();
+    this.name = data.name;
+    this.email = data.email;
+    this.password = hashedPassword;
+    this.school = data.school;
+    this.sport = data.sport;
+    this.coachType = data.coachType;
+    this.createdAt = new Date().toISOString();
+  }
+
+  getDashboardType() {
+    return "coach";
+  }
+}
+
+// ─────────────────────────────────────────
+// High School Coach — extends Coach
+// ─────────────────────────────────────────
+class HighSchoolCoach extends Coach {
+  constructor(data, hashedPassword) {
+    super(data, hashedPassword);
+    this.roster = [];
+    this.coachType = "highschool";
+  }
+
+  getDashboardType() {
+    return "highschool_coach";
+  }
+}
+
+// ─────────────────────────────────────────
+// College Coach — extends Coach
+// ─────────────────────────────────────────
+class CollegeCoach extends Coach {
+  constructor(data, hashedPassword) {
+    super(data, hashedPassword);
+    this.wishList = [];
+    this.coachType = "college";
+  }
+
+  getDashboardType() {
+    return "college_coach";
+  }
+}
+
+// ─────────────────────────────────────────
+// Factory — creates the right coach type
+// ─────────────────────────────────────────
+function createCoach(data, hashedPassword) {
+  if (data.coachType === "highschool") {
+    return new HighSchoolCoach(data, hashedPassword);
+  }
+  return new CollegeCoach(data, hashedPassword);
+}
+
+// ─────────────────────────────────────────
 // REGISTER — POST /api/coaches/register
 // ─────────────────────────────────────────
 async function registerCoach(req, res) {
-  const { name, email, password, school, sport } = req.body;
+ const { name, email, password, school, sport, coachType } = req.body;
 
-  // Validate — all fields required
-  if (!name || !email || !password || !school || !sport) {
-    return res.status(400).json({ error: "All fields are required" });
-  }
-
+if (!name || !email || !password || !school || !sport || !coachType) {
+return res.status(400).json({ error: "All fields are required"});
+}
   const coaches = readCoaches();
 
   // Block duplicate emails
@@ -41,19 +99,13 @@ async function registerCoach(req, res) {
     return res.status(400).json({ error: "Email already registered" });
   }
 
+
   // Hash the password — never store plain text
   const hashedPassword = await bcrypt.hash(password, 10);
 
   // Build the new coach object
-  const newCoach = {
-    id: uuidv4(),
-    name,
-    email,
-    password: hashedPassword,
-    school,
-    sport,
-    createdAt: new Date().toISOString()
-  };
+  // Build the new coach using OOP factory
+const newCoach = createCoach(req.body, hashedPassword);
 
   // Save to file
   coaches.push(newCoach);
@@ -62,7 +114,13 @@ async function registerCoach(req, res) {
   // Respond — never send password back
   res.status(201).json({
     message: "Coach profile created successfully!",
-    coach: { id: newCoach.id, name, email, school, sport }
+   coach: { id: newCoach.id, 
+            name, 
+            email,
+            school, 
+            sport, 
+            coachType: newCoach.coachType 
+          }
   });
 }
 
@@ -113,6 +171,7 @@ function getAllCoaches(req, res) {
     email: c.email,
     school: c.school,
     sport: c.sport,
+    coachType:c.coachType || "unknown",
     createdAt: c.createdAt
   }));
 
