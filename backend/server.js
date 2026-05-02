@@ -1,4 +1,4 @@
-
+require('dotenv').config();
 
 const express = require("express");
 const app = express();
@@ -18,6 +18,9 @@ app.use("/api/coaches", coachRoutes);
 // Mount athlete routes — any request to /api/athletes gets handled here
 const athleteRoutes = require("./routes/athletes");
 app.use("/api/athletes", athleteRoutes);
+// Mount matching routes — any request to /api/matching gets handled here
+const matchingRoutes = require("./routes/matching");
+app.use("/api/matching", matchingRoutes);
 
 // Start the server
 app.listen(3000, () => {
