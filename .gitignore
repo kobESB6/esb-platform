@@ -35,3 +35,4 @@ backend/data/
 .env
 secrets.toml
 backend/data/
+backend/.env
