@@ -27,7 +27,7 @@ async function writeAthletes(athletes) {
 }
 
 // Build the starting progression block — same engine as Legend
-function createProgression() {
+function createProgression(role) {
   return {
     level: 1,
     xp: 50,
@@ -166,7 +166,7 @@ router.post('/register', async (req, res) => {
         legendsMentoring: []
       },
 
-      progression: createProgression()
+      progression: createProgression('athlete')
     };
 
     // Save to data store

@@ -26,7 +26,7 @@ async function writeLegends(legends) {
 }
 
 // Build the starting progression block — every new user gets this
-function createProgression() {
+function createProgression(role) {
   const startingRank = {
   athlete: 'Rookie',
   coach: 'New Coach',
@@ -147,7 +147,7 @@ router.post('/register', async (req, res) => {
         mentorshipStyle: ''
       },
 
-      progression: createProgression()
+      progression: createProgression('legend')
     };
 
     // Add to array and save
@@ -196,6 +196,42 @@ router.get('/:id', async (req, res) => {
 
   } catch (error) {
     res.status(500).json({ error: 'Could not retrieve legend' });
+  }
+});
+
+// POST /api/legends/login
+// Authenticates a Legend
+router.post('/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+
+    const legends = await readLegends();
+    const legend = legends.find(l => l.email === email);
+
+    if (!legend) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    const passwordMatch = await bcrypt.compare(password, legend.password);
+    if (!passwordMatch) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    // Return full profile — no password
+    const { password: _, ...legendWithoutPassword } = legend;
+
+    res.status(200).json({
+      message: 'Login successful!',
+      legend: legendWithoutPassword
+    });
+
+  } catch (error) {
+    console.error('Legend login error:', error);
+    res.status(500).json({ error: 'Server error during login' });
   }
 });
 
