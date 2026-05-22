@@ -50,7 +50,11 @@ function createProgression() {
     ]
   };
 }
-
+ const startingRank = {
+  athlete: 'Rookie',
+  coach: 'New Coach',
+  legend: 'Alumni'
+};
 // ─── ROUTES ──────────────────────────────────────────────────────
 
 // POST /api/athletes/register
@@ -150,6 +154,8 @@ router.post('/register', async (req, res) => {
           linkedin: null
         }
       },
+
+      linkedProfiles: [],
 
       recruiting: {
         targetSchools: [],

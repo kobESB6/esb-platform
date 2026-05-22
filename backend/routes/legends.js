@@ -27,6 +27,11 @@ async function writeLegends(legends) {
 
 // Build the starting progression block — every new user gets this
 function createProgression() {
+  const startingRank = {
+  athlete: 'Rookie',
+  coach: 'New Coach',
+  legend: 'Alumni'
+};
   return {
     level: 1,
     xp: 50,
@@ -131,6 +136,8 @@ router.post('/register', async (req, res) => {
           linkedin: null
         }
       },
+
+    linkedProfiles: [],
 
       mentorship: {
         isActiveMentor: true,
