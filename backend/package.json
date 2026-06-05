@@ -18,6 +18,9 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "inquirer": "^13.3.2",
+    "pg": "^8.21.0",
+    "pg-hstore": "^2.3.4",
+    "sequelize": "^6.37.8",
     "uuid": "^13.0.0"
   },
   "devDependencies": {

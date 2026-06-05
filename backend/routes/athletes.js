@@ -1,32 +1,15 @@
-// express router for athletes
 // routes/athletes.js
-// Handles all Athlete-related API endpoints
-// Athlete = current student athlete, journey in progress, building the product
+// Handles all Athlete-related API endpoints — NOW POSTGRES-BACKED
+// Athlete = current student athlete, journey in progress
 
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcrypt');
-const { v4: uuidv4 } = require('uuid');
-const fs = require('fs').promises;
-const path = require('path');
+const User = require('../models/User');   // ← replaces fs/path/JSON helpers
 
-// Path to our athletes data file
-const ATHLETES_FILE = path.join(__dirname, '../data/athletes.json');
+// NOTE: readAthletes/writeAthletes helpers are GONE — the DB is our store now.
 
-// ─── HELPER FUNCTIONS ────────────────────────────────────────────
-
-// Read all athletes from the JSON file
-async function readAthletes() {
-  const data = await fs.readFile(ATHLETES_FILE, 'utf-8');
-  return JSON.parse(data);
-}
-
-// Write updated athletes array back to the file
-async function writeAthletes(athletes) {
-  await fs.writeFile(ATHLETES_FILE, JSON.stringify(athletes, null, 2));
-}
-
-// Build the starting progression block — same engine as Legend
+// Build the starting progression block — same engine as before
 function createProgression(role) {
   return {
     level: 1,
@@ -34,7 +17,6 @@ function createProgression(role) {
     rank: 'Rookie',
     badges: [
       {
-        id: uuidv4(),
         name: 'First Step',
         description: 'Welcome to ESB — your journey starts here',
         earnedAt: new Date().toISOString()
@@ -42,39 +24,22 @@ function createProgression(role) {
     ],
     unlockedFeatures: ['basic_profile', 'browse_directory'],
     milestones: [
-      {
-        event: 'profile_created',
-        xpAwarded: 50,
-        timestamp: new Date().toISOString()
-      }
+      { event: 'profile_created', xpAwarded: 50, timestamp: new Date().toISOString() }
     ]
   };
 }
- const startingRank = {
-  athlete: 'Rookie',
-  coach: 'New Coach',
-  legend: 'Alumni'
-};
+
 // ─── ROUTES ──────────────────────────────────────────────────────
 
 // POST /api/athletes/register
-// Creates a new Athlete profile with full IDMM structure
 router.post('/register', async (req, res) => {
   try {
     const {
-      name,
-      email,
-      password,
-      primarySport,
-      position,
-      height,
-      weight,
-      school,
-      graduationYear,
-      gpa
+      name, email, password, primarySport, position,
+      height, weight, school, graduationYear, gpa
     } = req.body;
 
-    // Required fields validation
+    // Required fields validation (unchanged)
     if (!name || !email || !password || !primarySport || !position ||
         !height || !weight || !school || !graduationYear || !gpa) {
       return res.status(400).json({
@@ -82,31 +47,34 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    const athletes = await readAthletes();
-
-    // Block duplicate email registration
-    const existingAthlete = athletes.find(a => a.email === email);
-    if (existingAthlete) {
+    // Friendly duplicate check (the UNIQUE constraint is the real backstop)
+    const existing = await User.findOne({ where: { email } });
+    if (existing) {
       return res.status(409).json({ error: 'Email already registered' });
     }
 
-    // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Build the full Athlete profile using Data Model v1
-    const newAthlete = {
-      id: uuidv4(),
+    // CREATE — promoted fields at top level (→ columns), full bodies in JSONB
+    const newAthlete = await User.create({
+      // identity columns
       name,
       email,
       password: hashedPassword,
       role: 'athlete',
-      profilePhoto: null,
       tier: 'basic',
       isVerified: false,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
 
-      ON_THE_FIELD: {
+      // promoted matchable columns
+      primarySport,
+      sportsPlayed: [primarySport],   // seeded with primary; more added via edit later
+      position,
+      school,
+      graduationYear,
+      gpa,
+
+      // JSONB — ON THE FIELD
+      onTheField: {
         primarySport,
         sportsPlayed: [primarySport],
         position,
@@ -121,7 +89,8 @@ router.post('/register', async (req, res) => {
         highlights: []
       },
 
-      IN_THE_CLASSROOM: {
+      // JSONB — IN THE CLASSROOM
+      inTheClassroom: {
         gpa,
         sat: null,
         act: null,
@@ -133,7 +102,8 @@ router.post('/register', async (req, res) => {
         clearinghouseStatus: 'Not Registered'
       },
 
-      OFF_THE_FIELD: {
+      // JSONB — OFF THE FIELD
+      offTheField: {
         bio: '',
         personalStatement: '',
         myStory: '',
@@ -141,21 +111,11 @@ router.post('/register', async (req, res) => {
         leadershipRoles: [],
         communityService: [],
         characterTraits: [],
-        familyBackground: {
-          isPublic: false,
-          statement: ''
-        },
+        familyBackground: { isPublic: false, statement: '' },
         references: [],
         testimonials: [],
-        socialLinks: {
-          twitter: null,
-          instagram: null,
-          hudl: null,
-          linkedin: null
-        }
+        socialLinks: { twitter: null, instagram: null, hudl: null, linkedin: null }
       },
-
-      linkedProfiles: [],
 
       recruiting: {
         targetSchools: [],
@@ -166,15 +126,12 @@ router.post('/register', async (req, res) => {
         legendsMentoring: []
       },
 
+      linkedProfiles: [],
       progression: createProgression('athlete')
-    };
+    });
 
-    // Save to data store
-    athletes.push(newAthlete);
-    await writeAthletes(athletes);
-
-    // Return success — never send the password back
-    const { password: _, ...athleteWithoutPassword } = newAthlete;
+    // Never send the password back
+    const { password: _, ...athleteWithoutPassword } = newAthlete.toJSON();
 
     res.status(201).json({
       message: 'Athlete profile created successfully!',
@@ -188,18 +145,14 @@ router.post('/register', async (req, res) => {
 });
 
 // POST /api/athletes/login
-// Authenticates an athlete
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    const athletes = await readAthletes();
-    const athlete = athletes.find(a => a.email === email);
-
+    const athlete = await User.findOne({ where: { email, role: 'athlete' } });
     if (!athlete) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
@@ -209,9 +162,7 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    // Return safe profile — no password
-    const { password: _, ...athleteWithoutPassword } = athlete;
-
+    const { password: _, ...athleteWithoutPassword } = athlete.toJSON();
     res.status(200).json({
       message: 'Login successful!',
       athlete: athleteWithoutPassword
@@ -223,32 +174,29 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// GET /api/athletes
-// Returns all athletes without passwords
+// GET /api/athletes — all athletes, no passwords
 router.get('/', async (req, res) => {
   try {
-    const athletes = await readAthletes();
-    const safeAthletes = athletes.map(({ password, ...rest }) => rest);
-    res.json(safeAthletes);
+    const athletes = await User.findAll({
+      where: { role: 'athlete' },
+      attributes: { exclude: ['password'] }   // DB-level password exclusion
+    });
+    res.json(athletes);
   } catch (error) {
     res.status(500).json({ error: 'Could not retrieve athletes' });
   }
 });
 
-// GET /api/athletes/:id
-// Returns a single athlete profile by ID
+// GET /api/athletes/:id — single athlete by id
 router.get('/:id', async (req, res) => {
   try {
-    const athletes = await readAthletes();
-    const athlete = athletes.find(a => a.id === req.params.id);
-
-    if (!athlete) {
+    const athlete = await User.findByPk(req.params.id, {
+      attributes: { exclude: ['password'] }
+    });
+    if (!athlete || athlete.role !== 'athlete') {
       return res.status(404).json({ error: 'Athlete not found' });
     }
-
-    const { password, ...athleteWithoutPassword } = athlete;
-    res.json(athleteWithoutPassword);
-
+    res.json(athlete);
   } catch (error) {
     res.status(500).json({ error: 'Could not retrieve athlete' });
   }
