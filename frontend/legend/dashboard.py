@@ -43,7 +43,7 @@ def show_legend_dashboard():
     # ── ON THE FIELD ──────────────────────────────────────────────
     st.subheader("🏟️ On The Field")
 
-    on_field = user.get("ON_THE_FIELD", {})
+    on_field = user.get("onTheField", {})
     primary_sport = on_field.get("primarySport", "Not set")
     sports_played = on_field.get("sportsPlayed", [])
     highest_level = on_field.get("highestLevelPlayed", "Not set")
@@ -76,7 +76,7 @@ def show_legend_dashboard():
     # ── IN THE CLASSROOM ──────────────────────────────────────────
     st.subheader("📚 In The Classroom")
 
-    in_class = user.get("IN_THE_CLASSROOM", {})
+    in_class = user.get("inTheClassroom", {})
     colleges = in_class.get("collegesAttended", [])
     high_schools = in_class.get("highSchoolsAttended", [])
 
@@ -99,7 +99,7 @@ def show_legend_dashboard():
     # ── OFF THE FIELD ─────────────────────────────────────────────
     st.subheader("🌍 Off The Field")
 
-    off_field = user.get("OFF_THE_FIELD", {})
+    off_field = user.get("offTheField", {})
     bio = off_field.get("bio", "")
     occupation = off_field.get("occupation", {})
     mentorship_focus = off_field.get("mentorshipFocus", [])
