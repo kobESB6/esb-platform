@@ -1,82 +1,48 @@
 // routes/coaches.js
-// Handles all Coach-related API endpoints
-// Two coach types: HighSchoolCoach (roster) and CollegeCoach (wishList)
-// OOP class hierarchy preserved — factory pattern creates the right type
+// Coach API endpoints — NOW POSTGRES-BACKED
+// OOP hierarchy + factory PRESERVED — they build the object, Sequelize stores it
 
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcrypt');
 const { v4: uuidv4 } = require('uuid');
-const fs = require('fs').promises;
-const path = require('path');
+const User = require('../models/User');   // replaces fs/path/JSON helpers
 
-// Path to our coaches data file
-const COACHES_FILE = path.join(__dirname, '../data/coaches.json');
-
-// ─── HELPER FUNCTIONS ────────────────────────────────────────────
-
-// Read all coaches from the JSON file
-async function readCoaches() {
-  const data = await fs.readFile(COACHES_FILE, 'utf-8');
-  return JSON.parse(data);
-}
-
-// Write updated coaches array back to the file
-async function writeCoaches(coaches) {
-  await fs.writeFile(COACHES_FILE, JSON.stringify(coaches, null, 2));
-}
-
-// Build the starting progression block — same engine across all user types
+// Progression engine — unchanged
 function createProgression(role) {
-    const startingRank = {
-  athlete: 'Rookie',
-  coach: 'New Coach',
-  legend: 'Alumni'
-};
-
+  const startingRank = { athlete: 'Rookie', coach: 'New Coach', legend: 'Alumni' };
   return {
     level: 1,
     xp: 50,
     rank: startingRank?.[role] ?? 'Rookie',
-    badges: [
-      {
-        id: uuidv4(),
-        name: 'First Step',
-        description: 'Welcome to ESB — your journey starts here',
-        earnedAt: new Date().toISOString()
-      }
-    ],
+    badges: [{
+      id: uuidv4(),
+      name: 'First Step',
+      description: 'Welcome to ESB — your journey starts here',
+      earnedAt: new Date().toISOString()
+    }],
     unlockedFeatures: ['basic_profile', 'browse_directory'],
-    milestones: [
-      {
-        event: 'profile_created',
-        xpAwarded: 50,
-        timestamp: new Date().toISOString()
-      }
-    ]
+    milestones: [{ event: 'profile_created', xpAwarded: 50, timestamp: new Date().toISOString() }]
   };
 }
 
-// ─── OOP CLASS HIERARCHY ─────────────────────────────────────────
-// Preserved from Week 1 — coachType drives the dashboard experience
-// High school coaches manage rosters
-// College coaches manage wishlists
-// Same base, different tools
+// ─── OOP CLASS HIERARCHY (PRESERVED) ─────────────────────────────
+// These now build a plain object shaped for User.create().
+// Note: id/timestamps removed — Sequelize generates those now.
 
 class Coach {
   constructor(data, hashedPassword) {
-    this.id = uuidv4();
     this.name = data.name;
     this.email = data.email;
     this.password = hashedPassword;
     this.role = 'coach';
-    this.profilePhoto = null;
     this.tier = 'basic';
     this.isVerified = false;
-    this.createdAt = new Date().toISOString();
-    this.updatedAt = new Date().toISOString();
 
-    // ── ON THE FIELD ──────────────────────────────
+    // promoted column
+    this.coachType = data.coachType;
+
+    // ── ON THE FIELD ──
     this.ON_THE_FIELD = {
       sport: data.sport,
       position: data.position || 'Head Coach',
@@ -87,7 +53,6 @@ class Coach {
       filmArchive: []
     };
 
-    // ── IN THE CLASSROOM ──────────────────────────
     this.IN_THE_CLASSROOM = {
       education: [],
       certifications: [],
@@ -95,7 +60,6 @@ class Coach {
       academicSupport: ''
     };
 
-    // ── OFF THE FIELD ─────────────────────────────
     this.OFF_THE_FIELD = {
       bio: data.bio || '',
       coachingPhilosophy: '',
@@ -103,126 +67,93 @@ class Coach {
       communityInvolvement: [],
       formerPlayers: [],
       testimonials: [],
-      socialLinks: {
-        twitter: null,
-        linkedin: null
-      }
+      socialLinks: { twitter: null, linkedin: null }
     };
 
-    // ── LINKED PROFILES ───────────────────────────
-    // Connects this profile to other roles this person holds
-    // e.g. a coach who was also an athlete, a legend who also coaches
     this.linkedProfiles = [];
-
-    // ── PROGRESSION ───────────────────────────────
-   this.progression = createProgression('coach');
-  }
-
-  getDashboardType() {
-    return 'coach';
+    this.progression = createProgression('coach');
   }
 }
 
-// High School Coach — manages a current roster
 class HighSchoolCoach extends Coach {
   constructor(data, hashedPassword) {
     super(data, hashedPassword);
-    // Add roster to ON_THE_FIELD — HS coaches manage current players
     this.ON_THE_FIELD.roster = [];
     this.ON_THE_FIELD.coachType = 'highschool';
-  }
-
-  getDashboardType() {
-    return 'highschool_coach';
+    this.coachType = 'highschool';
   }
 }
 
-// College Coach — manages a recruiting wishlist
 class CollegeCoach extends Coach {
   constructor(data, hashedPassword) {
     super(data, hashedPassword);
-    // Add wishList to ON_THE_FIELD — college coaches recruit
     this.ON_THE_FIELD.wishList = {
-      sports: [],
-      positions: [],
-      divisions: [],
-      gpaMinimum: null,
-      graduationYears: [],
-      athleteTypes: []
+      sports: [], positions: [], divisions: [],
+      gpaMinimum: null, graduationYears: [], athleteTypes: []
     };
     this.ON_THE_FIELD.coachType = 'college';
-    // College coaches also track recruiting activity
+    this.coachType = 'college';
     this.recruiting = {
-      athletesContacted: [],
-      athletesSaved: [],
-      matchesReviewed: 0,
-      openRosters: 0
+      athletesContacted: [], athletesSaved: [],
+      matchesReviewed: 0, openRosters: 0
     };
-  }
-
-  getDashboardType() {
-    return 'college_coach';
   }
 }
 
-// Factory function — builds the right coach type automatically
 function createCoach(data, hashedPassword) {
-  if (data.coachType === 'highschool') {
-    return new HighSchoolCoach(data, hashedPassword);
-  }
+  if (data.coachType === 'highschool') return new HighSchoolCoach(data, hashedPassword);
   return new CollegeCoach(data, hashedPassword);
+}
+
+// Maps the OOP object's UPPERCASE IDMM keys → the model's JSONB columns
+function toUserRecord(coachObj) {
+  return {
+    name: coachObj.name,
+    email: coachObj.email,
+    password: coachObj.password,
+    role: coachObj.role,
+    tier: coachObj.tier,
+    isVerified: coachObj.isVerified,
+    coachType: coachObj.coachType,
+    primarySport: coachObj.ON_THE_FIELD.sport,   // promote sport → column
+    school: coachObj.ON_THE_FIELD.school,         // promote school → column
+    onTheField: coachObj.ON_THE_FIELD,
+    inTheClassroom: coachObj.IN_THE_CLASSROOM,
+    offTheField: coachObj.OFF_THE_FIELD,
+    recruiting: coachObj.recruiting || {},        // only college coaches have this
+    linkedProfiles: coachObj.linkedProfiles,
+    progression: coachObj.progression
+  };
 }
 
 // ─── ROUTES ──────────────────────────────────────────────────────
 
 // POST /api/coaches/register
-// Creates a new Coach profile — type determined by coachType field
 router.post('/register', async (req, res) => {
   try {
-    const {
-      name,
-      email,
-      password,
-      school,
-      sport,
-      coachType
-    } = req.body;
+    const { name, email, password, school, sport, coachType } = req.body;
 
-    // Required fields validation
     if (!name || !email || !password || !school || !sport || !coachType) {
       return res.status(400).json({
         error: 'name, email, password, school, sport, and coachType are required'
       });
     }
-
-    // Validate coachType value
     if (!['highschool', 'college'].includes(coachType)) {
-      return res.status(400).json({
-        error: 'coachType must be either highschool or college'
-      });
+      return res.status(400).json({ error: 'coachType must be either highschool or college' });
     }
 
-    const coaches = await readCoaches();
-
-    // Block duplicate email registration
-    const existingCoach = coaches.find(c => c.email === email);
-    if (existingCoach) {
+    const existing = await User.findOne({ where: { email } });
+    if (existing) {
       return res.status(409).json({ error: 'Email already registered' });
     }
 
-    // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Factory creates the right coach type automatically
-    const newCoach = createCoach(req.body, hashedPassword);
+    // factory builds the right type → mapper shapes it → Sequelize stores it
+    const coachObj = createCoach(req.body, hashedPassword);
+    const newCoach = await User.create(toUserRecord(coachObj));
 
-    // Save to data store
-    coaches.push(newCoach);
-    await writeCoaches(coaches);
-
-    // Return success — never send the password back
-    const { password: _, ...coachWithoutPassword } = newCoach;
-
+    const { password: _, ...coachWithoutPassword } = newCoach.toJSON();
     res.status(201).json({
       message: 'Coach profile created successfully!',
       coach: coachWithoutPassword
@@ -235,18 +166,14 @@ router.post('/register', async (req, res) => {
 });
 
 // POST /api/coaches/login
-// Authenticates a coach
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    const coaches = await readCoaches();
-    const coach = coaches.find(c => c.email === email);
-
+    const coach = await User.findOne({ where: { email, role: 'coach' } });
     if (!coach) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
@@ -256,47 +183,38 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    // Return full profile — no password
-    const { password: _, ...coachWithoutPassword } = coach;
-
-    res.status(200).json({
-      message: 'Login successful!',
-      coach: coachWithoutPassword
-    });
+    const { password: _, ...coachWithoutPassword } = coach.toJSON();
+    res.status(200).json({ message: 'Login successful!', coach: coachWithoutPassword });
 
   } catch (error) {
-    console.error('Coach login error:', Error);
-
+    console.error('Coach login error:', error);   // ← fixed: was Error (capital), a bug in your original
     res.status(500).json({ error: 'Server error during login' });
   }
 });
 
 // GET /api/coaches
-// Returns all coaches without passwords
 router.get('/', async (req, res) => {
   try {
-    const coaches = await readCoaches();
-    const safeCoaches = coaches.map(({ password, ...rest }) => rest);
-    res.json(safeCoaches);
+    const coaches = await User.findAll({
+      where: { role: 'coach' },
+      attributes: { exclude: ['password'] }
+    });
+    res.json(coaches);
   } catch (error) {
     res.status(500).json({ error: 'Could not retrieve coaches' });
   }
 });
 
 // GET /api/coaches/:id
-// Returns a single coach profile by ID
 router.get('/:id', async (req, res) => {
   try {
-    const coaches = await readCoaches();
-    const coach = coaches.find(c => c.id === req.params.id);
-
-    if (!coach) {
+    const coach = await User.findByPk(req.params.id, {
+      attributes: { exclude: ['password'] }
+    });
+    if (!coach || coach.role !== 'coach') {
       return res.status(404).json({ error: 'Coach not found' });
     }
-
-    const { password, ...coachWithoutPassword } = coach;
-    res.json(coachWithoutPassword);
-
+    res.json(coach);
   } catch (error) {
     res.status(500).json({ error: 'Could not retrieve coach' });
   }

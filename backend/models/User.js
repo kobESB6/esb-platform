@@ -30,6 +30,7 @@ const User = sequelize.define('User', {
   school:         { type: DataTypes.STRING, allowNull: true },
   graduationYear: { type: DataTypes.INTEGER, allowNull: true },
   gpa:            { type: DataTypes.DECIMAL(3, 2), allowNull: true },
+    coachType:      { type: DataTypes.STRING, allowNull: true },   // ← add here: 'highschool' | 'college', null for non-coaches
  
 
   // ─── IDMM BODIES (JSONB — the flexible, evolving profile) ───
@@ -38,11 +39,14 @@ const User = sequelize.define('User', {
   offTheField:    { type: DataTypes.JSONB, defaultValue: {} },
 
   // ─── OTHER FLEXIBLE BLOBS ───
-  recruiting:     { type: DataTypes.JSONB, defaultValue: {} },
+  recruiting:     { type: DataTypes.JSONB, defaultValue: {} },   // coach recruiting activity
+  mentorship:     { type: DataTypes.JSONB, defaultValue: {} },   // legend↔athlete mentorship
   linkedProfiles: { type: DataTypes.JSONB, defaultValue: [] },
   progression:    { type: DataTypes.JSONB, defaultValue: {} },
-  // ─── COACH PREFERENCES (empty for athletes/legends; filled for coaches) ───
+// ─── COACH PREFERENCES (empty for athletes/legends; filled for coaches) ───
   wishlist:       { type: DataTypes.JSONB, defaultValue: {} },
+
+  
 }, {
   tableName: 'users',
   timestamps: true,   // auto-manages createdAt + updatedAt
@@ -51,6 +55,7 @@ const User = sequelize.define('User', {
     { fields: ['primarySport'] },   // fast sport filtering
     { fields: ['graduationYear'] }, // fast recruiting-class filtering
     { fields: ['sportsPlayed'], using: 'gin' },   // ← multi-sport search
+    { fields: ['coachType'] },   // fast "get all college coaches"
   ],
 });
 
