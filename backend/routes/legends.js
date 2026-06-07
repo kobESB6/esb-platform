@@ -38,8 +38,8 @@ router.post('/register', async (req, res) => {
         error: 'name, email, password, and primarySport are required'
       });
     }
-
-    const existing = await User.findOne({ where: { email } });
+    const cleanEmail = email.trim().toLowerCase();
+    const existing = await User.findOne({ where: { email: cleanEmail } });
     if (existing) {
       return res.status(409).json({ error: 'Email already registered' });
     }
@@ -49,7 +49,7 @@ router.post('/register', async (req, res) => {
 
     const newLegend = await User.create({
       name,
-      email,
+      email: cleanEmail,
       password: hashedPassword,
       role: 'legend',
       tier: 'basic',
@@ -124,7 +124,8 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    const legend = await User.findOne({ where: { email, role: 'legend' } });
+    const cleanEmail = email.trim().toLowerCase(); 
+    const legend = await User.findOne({ where: { email: cleanEmail, role: 'legend' } });
     if (!legend) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }

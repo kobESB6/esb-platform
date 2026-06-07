@@ -48,7 +48,9 @@ router.post('/register', async (req, res) => {
     }
 
     // Friendly duplicate check (the UNIQUE constraint is the real backstop)
-    const existing = await User.findOne({ where: { email } });
+    // Normalize email so stored + looked-up values always match
+    const cleanEmail = email.trim().toLowerCase();
+    const existing = await User.findOne({ where: { email: cleanEmail } });
     if (existing) {
       return res.status(409).json({ error: 'Email already registered' });
     }
@@ -59,7 +61,7 @@ router.post('/register', async (req, res) => {
     const newAthlete = await User.create({
       // identity columns
       name,
-      email,
+      email: cleanEmail,
       password: hashedPassword,
       role: 'athlete',
       tier: 'basic',
@@ -151,8 +153,9 @@ router.post('/login', async (req, res) => {
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
     }
+    const cleanEmail = email.trim().toLowerCase();
+    const athlete = await User.findOne({ where: { email: cleanEmail, role: 'athlete' } });
 
-    const athlete = await User.findOne({ where: { email, role: 'athlete' } });
     if (!athlete) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }

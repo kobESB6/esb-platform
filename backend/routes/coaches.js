@@ -141,8 +141,8 @@ router.post('/register', async (req, res) => {
     if (!['highschool', 'college'].includes(coachType)) {
       return res.status(400).json({ error: 'coachType must be either highschool or college' });
     }
-
-    const existing = await User.findOne({ where: { email } });
+    const cleanEmail = email.trim().toLowerCase();
+    const existing = await User.findOne({ where: { email: cleanEmail } });
     if (existing) {
       return res.status(409).json({ error: 'Email already registered' });
     }
@@ -150,7 +150,7 @@ router.post('/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // factory builds the right type → mapper shapes it → Sequelize stores it
-    const coachObj = createCoach(req.body, hashedPassword);
+    const coachObj = createCoach({...req.body, email: cleanEmail }, hashedPassword);
     const newCoach = await User.create(toUserRecord(coachObj));
 
     const { password: _, ...coachWithoutPassword } = newCoach.toJSON();
@@ -173,7 +173,8 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    const coach = await User.findOne({ where: { email, role: 'coach' } });
+    const cleanEmail = email.trim().toLowerCase();
+    const coach = await User.findOne({ where: { email: cleanEmail, role: 'coach' } });
     if (!coach) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
