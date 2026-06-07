@@ -14,7 +14,7 @@ def users_exist():
     return os.path.exists(USER_DB) and os.path.getsize(USER_DB) > 0
 
 # -- UI Elements --
-st.image("media/esb_background.png", use_container_width=True)
+st.image("media/esb_background.png", width='stretch')
 
 st.markdown("""
     <style>
