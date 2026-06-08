@@ -3,6 +3,7 @@
 # Building the product, becoming an active participant in their recruiting
 
 import streamlit as st
+from athlete.edit_profile import render_edit_profile   # at the top with other imports
 
 def show_athlete_dashboard():
 
@@ -132,6 +133,12 @@ def show_athlete_dashboard():
 
     if not (bio or my_story or character_traits or leadership_roles):
         st.info("No off-the-field story added yet — this is where your character shines.")
+
+    st.markdown("---")
+
+    # ── EDIT PROFILE ──────────────────────────────────────────────
+    with st.expander("✏️ Edit My Profile"):
+        render_edit_profile()
 
     st.markdown("---")
 
