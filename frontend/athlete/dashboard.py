@@ -3,21 +3,27 @@
 # Building the product, becoming an active participant in their recruiting
 
 import streamlit as st
-from athlete.edit_profile import render_edit_profile   # at the top with other imports
+# Per-section edit forms — each rendered inline under its matching display section.
+from athlete.edit_profile import (
+    edit_on_the_field,
+    edit_in_the_classroom,
+    edit_off_the_field,
+    edit_contact,
+)
 
 def show_athlete_dashboard():
 
-    # ── Access Control ────────────────────────────────────────────
+    # -- Access Control --------------------------------------------
     if not st.session_state.get("logged_in") or st.session_state.get("role") != "athlete":
         st.error("🔒 Access Denied. This dashboard is for Athletes only.")
         st.stop()
 
-    # ── Pull user data from session ───────────────────────────────
+    # -- Pull user data from session -------------------------------
     user = st.session_state.get("user", {})
     user_name = user.get("name", "Athlete")
     is_verified = user.get("isVerified", False)
 
-    # ── Page Header + Verification Badge ──────────────────────────
+    # -- Page Header + Verification Badge --------------------------
     st.title("🏃 Athlete Dashboard")
     st.markdown(f"Welcome, **{user_name}**!")
 
@@ -29,7 +35,7 @@ def show_athlete_dashboard():
     st.markdown("*Providing Knowledge · Cultivating Passion · Advocates for Life*")
     st.markdown("---")
 
-    # ── Progression Block ─────────────────────────────────────────
+    # -- Progression Block -----------------------------------------
     progression = user.get("progression", {})
     if progression:
         col1, col2, col3 = st.columns(3)
@@ -41,7 +47,7 @@ def show_athlete_dashboard():
             st.metric("XP", progression.get("xp", 50))
         st.markdown("---")
 
-    # ── ON THE FIELD ──────────────────────────────────────────────
+    # -- ON THE FIELD ----------------------------------------------
     st.subheader("🏟️ On The Field")
 
     on_field = user.get("onTheField", {})
@@ -75,9 +81,12 @@ def show_athlete_dashboard():
     else:
         st.info("No highlights added yet.")
 
+    with st.expander("✏️ Edit On The Field"):
+        edit_on_the_field(user)
+
     st.markdown("---")
 
-    # ── IN THE CLASSROOM ──────────────────────────────────────────
+    # -- IN THE CLASSROOM ------------------------------------------
     st.subheader("📚 In The Classroom")
 
     in_class = user.get("inTheClassroom", {})
@@ -107,9 +116,12 @@ def show_athlete_dashboard():
     else:
         st.info("No academic achievements added yet.")
 
+    with st.expander("✏️ Edit In The Classroom"):
+        edit_in_the_classroom(user)
+
     st.markdown("---")
 
-    # ── OFF THE FIELD ─────────────────────────────────────────────
+    # -- OFF THE FIELD ---------------------------------------------
     st.subheader("🌍 Off The Field")
 
     off_field = user.get("offTheField", {})
@@ -134,15 +146,29 @@ def show_athlete_dashboard():
     if not (bio or my_story or character_traits or leadership_roles):
         st.info("No off-the-field story added yet — this is where your character shines.")
 
-    st.markdown("---")
-
-    # ── EDIT PROFILE ──────────────────────────────────────────────
-    with st.expander("✏️ Edit My Profile"):
-        render_edit_profile()
+    with st.expander("✏️ Edit Off The Field"):
+        edit_off_the_field(user)
 
     st.markdown("---")
 
-    # ── LOGOUT ────────────────────────────────────────────────────
+    # -- CONTACT & LINKS -------------------------------------------
+    st.subheader("📇 Contact & Links")
+    social = off_field.get("socialLinks", {}) or {}
+    any_link = any(social.get(k) for k in ("twitter", "instagram", "hudl", "linkedin"))
+    if any_link:
+        if social.get("twitter"):   st.markdown(f"**Twitter/X:** {social['twitter']}")
+        if social.get("instagram"): st.markdown(f"**Instagram:** {social['instagram']}")
+        if social.get("hudl"):      st.markdown(f"**Hudl:** {social['hudl']}")
+        if social.get("linkedin"):  st.markdown(f"**LinkedIn:** {social['linkedin']}")
+    else:
+        st.info("No links added yet.")
+
+    with st.expander("✏️ Edit Contact & Links"):
+        edit_contact(user)
+
+    st.markdown("---")
+
+    # -- LOGOUT ----------------------------------------------------
     if st.button("Log Out"):
         st.session_state.clear()
         st.switch_page("main.py")
