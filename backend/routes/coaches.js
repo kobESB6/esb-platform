@@ -221,4 +221,57 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+
+// PATCH /api/coaches/:id 
+// per-section inline eidt. Same proven shape as the sthlete route: 
+// scalars asign -if-provided, JSONB blobs shallow spread-merge. 
+router.patch('/:id', async (req, res) => {
+  try { 
+    // 1. Find the coach by primary key (UUID)
+    const user = await User.findByPk(req.params.id);
+    
+    // 2. Guard: must exist and be a coach  the coach endpoint 
+    // must not edit as athlete or legend row by ID.
+    if (!user || user.role !== 'coach') {
+      return res.status(404).json({ error: 'Coach not found'});
+    }
+    // 3. Pull every updatable field. Anything not sent = undefind = skipped.
+    const {
+      //  promoted scalar columns:
+      name, coachType, primarySport, school, 
+      // JSON blobs:
+      onTheField, inTheClassroom, offTheField, recruiting, wishlist,
+    } = req.body;
+
+    //   CATEGORY 1: scalar columns - assign only if provided 
+    //  `!== undefined` so deliberate "" still saves intentionally.
+    if (name          !== undefined) user.name          = name;
+    if (coachType     !== undefined) user.coachType     = coachType;
+    if (primarySport  !== undefined) user.primarySport  = primarySport;
+    if (school        !== undefined) user.school        = school;
+
+    //  CATEGOREY 2: JSON blobs - shallow spread-merge 
+    //  `{ ... old, ...incoming }` : new object reference (Sequelize detects it)
+    //  AND keeps untouched keys while overwriting the ones sent.
+    //  SHALLOW: nested objects (wishlist.sports, recruiting..athletesSaved)
+    // are replaced wholesale - each from must send its whole sub-object
+    if (onTheField      !== undefined) user.onTheField          = { ...user.onTheField, ...onTheField };
+    if (inTheClassroom  !== undefined) user.inTheClassroom      = { ...user.inTheClassroom, ...inTheClassroom }; 
+    if (offTheField     !== undefined) user.offTheField         = { ...user.offTheField, ...offTheField };
+    if (recruiting      !== undefined) user.recruiting          = { ...user.recruiting, ...recruiting };
+    if (wishlist        !== undefined) user.wishlist            = { ...user.wishlist, ...wishlist };
+    
+    // 4. Persist - one UPDATE, only changed attrubutes
+    await user.save();
+
+    // 5. Return updates row minus the password has 
+    const { password: _omit, ...safeUser } = user.toJSON();
+    res.json(safeUser);
+
+  } catch (err) {
+    console.error('PATCH /api/coaches/:id failed:', err);
+    res.status(500).json({ error: 'Failed to update coach' });
+  }
+  });
+
 module.exports = router;
