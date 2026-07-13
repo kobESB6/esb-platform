@@ -7,7 +7,7 @@
 # SOURCE-OF-TRUTH RULE (settled):
 #   Searchable fields -> promoted COLUMNS (primarySport, school, coachType)
 #   Narrative fields  -> JSONB BLOBS (bio, coachingPhilosophy, academicSupport)
-#   Recruiting targets -> wishlist COLUMN (canonical; NOT onTheField.wishList)
+#   Recruiting targets -> wishlist COLUMN (canonical; NOT onTheField.wishlist)
 #   A form NEVER writes a searchable value into a blob.
 
 import streamlit as st
@@ -146,3 +146,97 @@ def edit_contact(user):
             # send the WHOLE socialLinks object (existing spread + changes).
             payload["offTheField"] = {"socialLinks": {**social, **link_changes}}
         _patch(coach_id, payload, user)    
+
+   # Sport-keyed positions/events map — TEMPORARY.
+# TODO: extract to a shared sports taxonomy module (`utils/sports.py`) so the
+# athlete sports editor imports the SAME source. Hardcoded twice = drift.
+# Note Track & Field has EVENTS, not positions — the key is per-sport shape,
+# not one flat list. A football coach must never see "Goalkeeper".
+POSITIONS_BY_SPORT = {
+    "Football":      ["QB", "RB", "WR", "TE", "OL", "DL", "LB", "DB", "K/P"],
+    "Basketball":    ["PG", "SG", "SF", "PF", "C"],
+    "Baseball":      ["Pitcher", "Catcher", "1B", "2B", "3B", "SS", "OF"],
+    "Softball":      ["Pitcher", "Catcher", "1B", "2B", "3B", "SS", "OF"],
+    "Soccer":        ["Goalkeeper", "Defender", "Midfielder", "Forward"],
+    "Volleyball":    ["Setter", "Outside Hitter", "Middle Blocker",
+                      "Opposite", "Libero"],
+    "Wrestling":     ["106", "113", "120", "126", "132", "138", "145",
+                      "152", "160", "170", "182", "195", "220", "285"],
+    "Track & Field": ["100m", "200m", "400m", "800m", "1600m", "3200m",
+                      "110m Hurdles", "300m Hurdles", "Long Jump",
+                      "High Jump", "Triple Jump", "Pole Vault",
+                      "Shot Put", "Discus", "Javelin", "Relays"],
+}
+
+SPORT_OPTIONS = list(POSITIONS_BY_SPORT.keys())   # single source — no drift
+GRAD_YEAR_OPTIONS = [2026, 2027, 2028, 2029, 2030]
+
+
+def edit_wishlist(user):
+    coach_id = _coach_id(user)
+    if not coach_id:
+        return
+
+    if user.get("coachType") != "college":
+        st.info("The recruiting wishlist is for college coaches.")
+        return
+
+    wl = user.get("wishlist", {}) or {}
+    current_sports    = wl.get("sports", []) or []
+    current_positions = wl.get("positions", []) or []
+    current_gpa       = wl.get("gpaMinimum")
+    current_grad      = wl.get("graduationYears", []) or []
+
+    # Positions derive from SAVED sports, not the in-form selection. Inside an
+    # st.form, widgets don't react to each other — the form only reruns on
+    # submit. So: save sports first, reopen, then positions/events appear.
+    position_options = []
+    for sport in current_sports:
+        position_options.extend(POSITIONS_BY_SPORT.get(sport, []))
+
+    st.caption("Your recruiting criteria — this is what the matcher uses to find athletes for you.")
+    with st.form("edit_coach_wishlist_form"):
+        new_sports = st.multiselect(
+            "Sports", options=SPORT_OPTIONS,
+            default=[s for s in current_sports if s in SPORT_OPTIONS],
+        )
+
+        if position_options:
+            new_positions = st.multiselect(
+                "Positions / Events", options=position_options,
+                default=[p for p in current_positions if p in position_options],
+                help="Options come from your saved sports.",
+            )
+        else:
+            st.caption("↳ Select your sports and save — positions and events will appear here.")
+            new_positions = current_positions   # unchanged; won't be diffed
+
+        new_grad = st.multiselect(
+            "Graduation years", options=GRAD_YEAR_OPTIONS,
+            default=[g for g in current_grad if g in GRAD_YEAR_OPTIONS],
+        )
+        new_gpa = st.number_input(
+            "Minimum GPA (0.0 = no minimum)",
+            min_value=0.0, max_value=4.0, step=0.1,
+            value=float(current_gpa) if current_gpa is not None else 0.0,
+        )
+        saved = st.form_submit_button("Save wishlist")
+
+    if saved:
+        gpa_to_store = new_gpa if new_gpa > 0 else None
+
+        # Dropping a sport must drop its positions too — otherwise a coach who
+        # removes Football keeps a stranded "QB" that no longer maps to anything.
+        still_valid = []
+        for sport in new_sports:
+            still_valid.extend(POSITIONS_BY_SPORT.get(sport, []))
+        new_positions = [p for p in new_positions if p in still_valid]
+
+        wl_changes = {}
+        if new_sports    != current_sports:    wl_changes["sports"]          = new_sports
+        if new_positions != current_positions: wl_changes["positions"]       = new_positions
+        if new_grad      != current_grad:      wl_changes["graduationYears"] = new_grad
+        if gpa_to_store  != current_gpa:       wl_changes["gpaMinimum"]      = gpa_to_store
+
+        payload = {"wishlist": wl_changes} if wl_changes else {}
+        _patch(coach_id, payload, user)

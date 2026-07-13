@@ -9,7 +9,7 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
-
+*.bak
 # Data files with user info
 data/users.json
 data/coaches.json

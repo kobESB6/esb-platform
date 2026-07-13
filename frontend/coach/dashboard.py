@@ -1,6 +1,6 @@
 import streamlit as st
 from utils.sidebar import hide_default_nav
-from coach.edit_profile import edit_off_the_field, edit_contact
+from coach.edit_profile import edit_off_the_field, edit_contact, edit_wishlist
 
 def show_coach_dashboard():
     hide_default_nav()
@@ -26,10 +26,23 @@ def show_coach_dashboard():
 
     if coach_type == 'college':
         st.subheader("🎯 Recruiting Wishlist")
-        st.info("Build your target athlete wishlist — AI matching coming soon.")
+        wl = st.session_state.user.get("wishlist", {}) or {}
+        if wl.get("sports") or wl.get("positions"):
+            st.markdown(f"**Sports:** {', '.join(wl.get('sports', [])) or '—'}")
+            st.markdown(f"**Positions:** {', '.join(wl.get('positions', [])) or '—'}")
+            grad = wl.get("graduationYears", [])
+            st.markdown(f"**Grad years:** {', '.join(str(g) for g in grad) or '—'}")
+            gpa = wl.get("gpaMinimum")
+            st.markdown(f"**Min GPA:** {gpa if gpa else '—'}")
+        else:
+            st.caption("No criteria set yet — add them below.")
+        with st.expander("✏️ Edit Wishlist"):
+            edit_wishlist(st.session_state.user)
+
     elif coach_type == 'highschool':
         st.subheader("📋 Your Roster")
         st.markdown("Track and manage your roster below.")
+
     else:
         st.warning("Coach type not set on your account. Please contact support or re-register.")
 # Off The Field — shared by both coach types (bio = trust surface)

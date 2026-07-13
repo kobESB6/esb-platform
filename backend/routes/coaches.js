@@ -87,7 +87,7 @@ class HighSchoolCoach extends Coach {
 class CollegeCoach extends Coach {
   constructor(data, hashedPassword) {
     super(data, hashedPassword);
-    this.ON_THE_FIELD.wishList = {
+    this.wishlist = {                        // ← top-level, matches model + PATCH route
       sports: [], positions: [], divisions: [],
       gpaMinimum: null, graduationYears: [], athleteTypes: []
     };
@@ -121,6 +121,7 @@ function toUserRecord(coachObj) {
     inTheClassroom: coachObj.IN_THE_CLASSROOM,
     offTheField: coachObj.OFF_THE_FIELD,
     recruiting: coachObj.recruiting || {},        // only college coaches have this
+    wishlist: coachObj.wishlist || {},
     linkedProfiles: coachObj.linkedProfiles,
     progression: coachObj.progression
   };
