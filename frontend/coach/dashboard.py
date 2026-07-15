@@ -1,6 +1,6 @@
 import streamlit as st
 from utils.sidebar import hide_default_nav
-from coach.edit_profile import edit_off_the_field, edit_contact, edit_wishlist
+from coach.edit_profile import edit_off_the_field, edit_contact, edit_wishlist, edit_on_the_field
 
 def show_coach_dashboard():
     hide_default_nav()
@@ -20,9 +20,19 @@ def show_coach_dashboard():
 
     st.title("🎓 Coach Dashboard")
     st.markdown(f"Welcome, **{st.session_state.user['name']}**!")
+
+    st.subheader("🏈 On The Field")
+    of = st.session_state.user.get("onTheField", {}) or {}
+    st.markdown(f"**School:** {st.session_state.user.get('school') or of.get('school') or '—'}")
+    st.markdown(f"**Sport:** {st.session_state.user.get('primarySport') or of.get('sport') or '—'}")
+    st.markdown(f"**Position:** {of.get('position') or '—'}")
+    st.markdown(f"**Division:** {of.get('division') or '—'}")
+    with st.expander("✏️ Edit On The Field"):
+        edit_on_the_field(st.session_state.user)   
     
     # Branch on coach type — value set at registration: 'highschool' | 'college'
     coach_type = st.session_state.user.get('coachType')
+
 
     if coach_type == 'college':
         st.subheader("🎯 Recruiting Wishlist")

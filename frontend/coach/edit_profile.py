@@ -240,3 +240,80 @@ def edit_wishlist(user):
 
         payload = {"wishlist": wl_changes} if wl_changes else {}
         _patch(coach_id, payload, user)
+
+ # ==================================================================
+# ON THE FIELD  (the column-vs-blob split, coach edition)
+#   Two fields write PROMOTED COLUMNS (searchable, matcher reads these):
+#     sport  -> primarySport column   (coach route DOES assign this)
+#     school -> school column         (coach route DOES assign this)
+#   Two fields write the BLOB (onTheField):
+#     division -> onTheField.division  (no column exists — blob only)
+#     position -> onTheField.position  (column exists BUT coach PATCH route
+#                 doesn't assign `position`, so the blob is the only path
+#                 that actually persists for a coach)
+#
+#   Canonical-column rule: for sport/school we write the COLUMN and let the
+#   blob's stale duplicate (onTheField.sport/.school) wither — same as the
+#   athlete template. The column is the single source of truth; we don't
+#   dual-write. This is the fix for the school-drift we saw ("TestU" column
+#   vs "Test U" blob).
+#
+#   coachType is READ-ONLY here. Changing it correctly means ARCHIVING the
+#   prior role (Advocates-for-Life archival subsystem, deferred). An editable
+#   switch would strand wishlist (college) / roster (HS) data. Honest = locked.
+#
+#   coachingHistory / filmArchive are deferred — arrays of structured objects
+#   that need their own sub-editors (film ties into the video-uploader work).
+# ==================================================================
+def edit_on_the_field(user):
+    coach_id = _coach_id(user)
+    if not coach_id:
+        return
+
+    on_field    = user.get("onTheField", {}) or {}
+    # sport/school: prefer the COLUMN (canonical), fall back to blob for display
+    current_sport  = user.get("primarySport") or on_field.get("sport", "")
+    current_school = user.get("school")       or on_field.get("school", "")
+    # division/position: blob is the only home for a coach
+    current_div    = on_field.get("division", "") or ""
+    current_pos    = on_field.get("position", "") or ""
+
+    DIVISION_OPTIONS = ["", "D1", "D2", "D3", "NAIA", "JUCO"]
+
+    # coachType shown but locked — see archival note above.
+    st.caption(f"Coach type: **{user.get('coachType', '—')}** "
+               "(changing this will be part of the coming profile-history feature)")
+
+    with st.form("edit_coach_onfield_form"):
+        col1, col2 = st.columns(2)
+        with col1:
+            new_school = st.text_input("School", value=current_school)
+            new_sport  = st.text_input("Primary sport", value=current_sport)
+        with col2:
+            new_pos = st.text_input("Position", value=current_pos)
+            # index guard: if a stored division isn't in our list, default to blank
+            div_index = DIVISION_OPTIONS.index(current_div) if current_div in DIVISION_OPTIONS else 0
+            new_div = st.selectbox("Division", options=DIVISION_OPTIONS, index=div_index,
+                                   help="Your program's level. Blank = not set.")
+        saved = st.form_submit_button("Save On The Field")
+
+    if saved:
+        payload = {}
+        blob_changes = {}
+
+        # --- COLUMNS (canonical) ---
+        if new_sport != current_sport:
+            payload["primarySport"] = new_sport
+        if new_school != current_school:
+            payload["school"] = new_school
+
+        # --- BLOB (onTheField) ---
+        if new_div != current_div:
+            blob_changes["division"] = new_div or None   # "" -> null
+        if new_pos != current_pos:
+            blob_changes["position"] = new_pos
+
+        if blob_changes:
+            payload["onTheField"] = blob_changes
+
+        _patch(coach_id, payload, user)       
