@@ -91,8 +91,8 @@ router.post('/register', async (req, res) => {
         socialLinks: { twitter: null, instagram: null, linkedin: null }
       },
 
-      // JSONB — mentorship (legend-specific) stored in recruiting blob
-      recruiting: {
+      // JSONB — mentorship (legend↔athlete)
+      mentorship: {
         isActiveMentor: true,
         athletesMentored: [],
         legendConnections: [],
@@ -172,4 +172,74 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// PATCH /api/legends/:id — partial update of a legend profile
+router.patch('/:id', async (req, res) => {
+  try {
+    // 1. Find the legend by primary key (the UUID in the URL).
+    const user = await User.findByPk(req.params.id);
+
+    // 2. Guard: must exist AND must actually be a legend row.
+    if (!user || user.role !== 'legend') {
+      return res.status(404).json({ error: 'Legend not found' });
+    }
+
+    // 3. Pull every updatable field. Anything not sent arrives as
+    //    `undefined` and gets skipped — that's what makes it a PATCH.
+    const {
+      // promoted scalar columns:
+      name, primarySport, position, school, graduationYear, profilePhoto,
+      // array column:
+      sportsPlayed, addSport,
+      // JSONB blobs:
+      onTheField, inTheClassroom, offTheField, mentorship,
+    } = req.body;
+
+    // ─── CATEGORY 1: scalar columns ───
+    // `!== undefined` not a truthy check, so a deliberate "" still saves.
+    // On a legend these mean *attended/played*, not currently enrolled.
+    if (name           !== undefined) user.name           = name;
+    if (primarySport   !== undefined) user.primarySport   = primarySport;
+    if (position       !== undefined) user.position       = position;
+    if (school         !== undefined) user.school         = school;
+    if (graduationYear !== undefined) user.graduationYear = graduationYear;
+    if (profilePhoto   !== undefined) user.profilePhoto   = profilePhoto;
+
+    // ─── CATEGORY 2: array column ───
+    // addSport appends one; sportsPlayed replaces the list.
+    // Both build a NEW array so Sequelize sees a changed reference.
+    if (addSport !== undefined) {
+      user.sportsPlayed = [...new Set([...user.sportsPlayed, addSport])];
+    } else if (sportsPlayed !== undefined) {
+      user.sportsPlayed = sportsPlayed;
+    }
+
+    // ─── CATEGORY 3: JSONB blobs — shallow spread-merge ───
+    // `{ ...old, ...incoming }` gives a new object reference (Sequelize
+    // dirty-tracking) while keeping keys the client didn't send.
+    // ⚠️ SHALLOW. `offTheField.occupation` is nested — send it whole.
+    if (onTheField !== undefined) {
+      user.onTheField = { ...user.onTheField, ...onTheField };
+    }
+    if (inTheClassroom !== undefined) {
+      user.inTheClassroom = { ...user.inTheClassroom, ...inTheClassroom };
+    }
+    if (offTheField !== undefined) {
+      user.offTheField = { ...user.offTheField, ...offTheField };
+    }
+    // mentorship — the legend↔athlete column (NOT recruiting, that's coach)
+    if (mentorship !== undefined) {
+      user.mentorship = { ...user.mentorship, ...mentorship };
+    }
+
+    // 4. Persist. One UPDATE, only the changed attributes.
+    await user.save();
+
+    // 5. Return the updated row, minus the password hash.
+    const { password: _omit, ...safeUser } = user.toJSON();
+    res.json(safeUser);
+  } catch (err) {
+    console.error('PATCH /api/legends/:id failed:', err);
+    res.status(500).json({ error: 'Failed to update legend' });
+  }
+});
 module.exports = router;

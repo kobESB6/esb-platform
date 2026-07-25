@@ -4,6 +4,7 @@
 
 import streamlit as st
 import requests
+from legend.edit_profile import edit_on_the_field, edit_off_the_field, edit_mentorship
 
 API_URL = "http://localhost:3000/api"
 
@@ -46,16 +47,20 @@ def show_legend_dashboard():
     on_field = user.get("onTheField", {})
     primary_sport = on_field.get("primarySport", "Not set")
     sports_played = on_field.get("sportsPlayed", [])
-    highest_level = on_field.get("highestLevelPlayed", "Not set")
+    highest_level = on_field.get("highestLevelPlayed") or "Not set"
+    position   = user.get("position") or "Not set"
+    school     = user.get("school") or "Not set"
+    grad_year  = user.get("graduationYear") or "Not set"
 
     col1, col2 = st.columns(2)
     with col1:
         st.markdown(f"**Primary Sport:** {primary_sport}")
         st.markdown(f"**Highest Level:** {highest_level}")
+        st.markdown(f"**Position:** {position}")
     with col2:
         st.markdown(f"**Sports Played:** {', '.join(sports_played) if sports_played else 'Not set'}")
-
-    st.markdown("**Career History**")
+        st.markdown(f"**School:** {school}")
+        st.markdown(f"**Graduation Year:** {grad_year}")
     career_history = on_field.get("careerHistory", [])
     if career_history:
         for entry in career_history:
@@ -71,7 +76,11 @@ def show_legend_dashboard():
     else:
         st.info("No media uploaded yet.")
 
+    with st.expander("✏️ Edit On The Field"):
+        edit_on_the_field(user)
+
     st.markdown("---")
+
 
     # ── IN THE CLASSROOM ──────────────────────────────────────────
     st.subheader("📚 In The Classroom")
@@ -101,18 +110,45 @@ def show_legend_dashboard():
 
     off_field = user.get("offTheField", {})
     bio = off_field.get("bio", "")
-    occupation = off_field.get("occupation", {})
+    occupation = off_field.get("occupation", {}) or {}
     mentorship_focus = off_field.get("mentorshipFocus", [])
 
     if bio:
         st.markdown(f"**Bio:** {bio}")
 
-    if occupation:
-        st.markdown(f"**Current Role:** {occupation.get('current', 'Not set')} at {occupation.get('company') or occupation.get('industry', 'Not set')}")
-        st.markdown(f"**Career Path:** {occupation.get('careerPath', 'Not set')}")
+    role     = occupation.get("current") or ""
+    industry = occupation.get("industry") or ""
+    company  = occupation.get("company") or ""
+    years    = occupation.get("yearsInField") or ""
+    path     = occupation.get("careerPath") or ""
+    network  = occupation.get("openToNetworking")
+
+    # Current Role — only join with "at" when there's an employer to show.
+    employer = company or industry
+    if role and employer:
+        st.markdown(f"**Current Role:** {role} at {employer}")
+    elif role:
+        st.markdown(f"**Current Role:** {role}")
+    elif employer:
+        st.markdown(f"**Current Role:** {employer}")
+
+    if industry:
+        st.markdown(f"**Industry:** {industry}")
+    if company:
+        st.markdown(f"**Company:** {company}")
+    if years:
+        st.markdown(f"**Years in Field:** {years}")
+    if path:
+        st.markdown(f"**Career Path:** {path}")
+    if network is not None:
+        st.markdown(f"**Open to Networking:** {'Yes' if network else 'No'}")
 
     if mentorship_focus:
         st.markdown(f"**Mentorship Focus:** {', '.join(mentorship_focus)}")
+
+    with st.expander("✏️ Edit Off The Field"):
+        edit_off_the_field(user)
+
 
     st.markdown("---")
 
@@ -133,6 +169,10 @@ def show_legend_dashboard():
         st.metric("Mentee Capacity", max_mentees)
 
     st.info("Mentorship connections coming in the next build.")
+
+    with st.expander("✏️ Edit Mentorship"):
+        edit_mentorship(user)
+
     st.markdown("---")
 
     # ── LOGOUT ────────────────────────────────────────────────────
