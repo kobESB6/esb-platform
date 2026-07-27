@@ -1,6 +1,7 @@
 import streamlit as st
+import requests
+from utils.auth import authenticate
 import time
-from utils.auth import authenticate  # ✅ make sure you're importing from utils/auth.py
 
 st.set_page_config(page_title="Login - ESB", layout="centered")
 
@@ -44,3 +45,19 @@ if st.button("Log In", key="login_button"):
 
     else:
         st.error("Invalid username or password.")
+
+
+# --- Forgot password ---
+with st.expander("Forgot password?"):
+    reset_email = st.text_input("Enter your account email", key="reset_email")
+    if st.button("Send reset link", key="send_reset"):
+        try:
+            r = requests.post(
+                "http://localhost:3000/api/auth/request-reset",
+                json={"email": reset_email}
+            )
+            # Enumeration-safe: same message regardless of whether the email exists.
+            st.info(r.json().get("message",
+                "If an account exists, a reset link has been generated."))
+        except Exception as e:
+            st.error(f"Could not reach the server: {e}")

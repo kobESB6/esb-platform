@@ -15,6 +15,8 @@ const User = sequelize.define('User', {
   name:  { type: DataTypes.STRING, allowNull: false },
   email: { type: DataTypes.STRING, allowNull: false, unique: true },
   password: { type: DataTypes.STRING, allowNull: false },  // bcrypt hash
+  resetToken:       { type: DataTypes.STRING, allowNull: true },   // bcrypt hash of reset token; null when no reset pending
+  resetTokenExpiry: { type: DataTypes.DATE,   allowNull: true },   // token dead after this timestamp; null when none pending
   role: {
     type: DataTypes.ENUM('athlete', 'coach', 'legend'),
     allowNull: false,

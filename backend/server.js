@@ -19,12 +19,14 @@ const athleteRoutes = require("./routes/athletes");
 const matchingRoutes = require("./routes/matching");
 // Mount legends route - any request to /api/legends gets handled here 
 const legendRoutes = require('./routes/legends');
-
+// Mount auth routes — password reset lives here, role-agnostic
+const authRoutes = require('./routes/auth');
 
 app.use("/api/coaches", coachRoutes);
 app.use("/api/athletes", athleteRoutes);
 app.use("/api/matching", matchingRoutes);
 app.use('/api/legends', legendRoutes);
+app.use('/api/auth', authRoutes);
 
 // Start the server
 app.listen(3000, () => {
