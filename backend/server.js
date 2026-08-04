@@ -2,10 +2,10 @@ require('dotenv').config();
 
 const express = require("express");
 const app = express();
-
+const path = require("path");
 // Middleware — teaches Express to read JSON request bodies
 app.use(express.json());
-
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 // Health check route — confirms server is alive
 app.get("/", (req, res) => {
   res.send("ESB Backend Running ✅");

@@ -6,6 +6,21 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcrypt');
 const User = require('../models/User');   // ← replaces fs/path/JSON helpers
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
+// ─── Video upload storage config (highlights) ───
+const VIDEO_DIR = path.join(__dirname, "..", "uploads", "videos");
+fs.mkdirSync(VIDEO_DIR, { recursive: true });   // self-heals dir on fresh clone
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, VIDEO_DIR),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);   // preserve .mp4 / .mov
+    cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
+  },
+});
+const upload = multer({ storage });
 
 // NOTE: readAthletes/writeAthletes helpers are GONE — the DB is our store now.
 
@@ -269,7 +284,6 @@ router.patch('/:id', async (req, res) => {
     if (offTheField !== undefined) {
       user.offTheField = { ...user.offTheField, ...offTheField };
     }
-
     // 4. Persist. One UPDATE, only the attributes Sequelize saw change.
     await user.save();
 
@@ -280,6 +294,65 @@ router.patch('/:id', async (req, res) => {
   } catch (err) {
     console.error('PATCH /api/athletes/:id failed:', err);
     res.status(500).json({ error: 'Failed to update athlete' });
+  }
+});
+// POST /api/athletes/:id/highlights/upload
+// Piece 1: receive a video file, store it on disk, return its URL.
+// Deliberately does NOT touch the DB yet — attach-to-profile is a separate step.
+router.post('/:id/highlights/upload', upload.single('video'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No video file received (field name must be "video")' });
+  }
+  const url = `/uploads/videos/${req.file.filename}`;
+  res.json({ url, filename: req.file.filename, size: req.file.size });
+});
+
+// POST /api/athletes/:id/highlights
+// Piece 2: append a clip object to onTheField.highlights.
+// (Tier gate lands here in piece 3.)
+router.post('/:id/highlights', async (req, res) => {
+  try {
+    const user = await User.findByPk(req.params.id);
+    if (!user || user.role !== 'athlete') {
+      return res.status(404).json({ error: 'Athlete not found' });
+    }
+
+    const { title, url } = req.body;
+    if (!url) return res.status(400).json({ error: 'url is required' });
+
+    const clip = {
+      title: title || 'Untitled',
+      url,
+      source: 'upload',
+      uploadedAt: new Date().toISOString(),
+    };
+
+    const existing = user.onTheField || {};
+    const currentHighlights = existing.highlights || [];
+
+    // ─── Piece 3: tier gate (count-based) ───
+    // Basic athletes are capped; premium is unlimited (for now).
+    const TIER_LIMITS = { basic: 2, premium: Infinity };
+    const limit = TIER_LIMITS[user.tier] ?? TIER_LIMITS.basic;   // unknown tier → most restrictive
+    if (currentHighlights.length >= limit) {
+      return res.status(403).json({
+        error: `Highlight limit reached for ${user.tier} tier (max ${limit}). Upgrade to add more.`,
+        tier: user.tier,
+        limit,
+        current: currentHighlights.length,
+      });
+    }
+
+    // Whole-object merge — same pattern as socialLinks.
+    // Double-spread: new array (append) + new onTheField ref (Sequelize dirty-tracking).
+    const highlights = [...currentHighlights, clip];
+    user.onTheField = { ...existing, highlights };
+    await user.save();
+    const { password: _omit, ...safeUser } = user.toJSON();
+    res.json(safeUser);
+  } catch (err) {
+    console.error('POST /api/athletes/:id/highlights failed:', err);
+    res.status(500).json({ error: 'Failed to add highlight' });
   }
 });
 module.exports = router;
