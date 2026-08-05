@@ -204,7 +204,75 @@ def edit_contact(user):
             payload["offTheField"] = {"socialLinks": {**social, **link_changes}}
         _patch(athlete_id, payload, user)
 
+# ==================================================================
+# HIGHLIGHTS — video upload (two-step: upload file → attach clip)
+# Mirrors the _patch refresh pattern, but the upload leg is multipart.
+# ==================================================================
+def upload_highlight(user):
+    aid = _athlete_id(user)
+    if not aid:
+        return
 
+    # Show current usage against tier so the athlete knows where they stand.
+    tier = user.get("tier", "basic")
+    current = len(user.get("onTheField", {}).get("highlights", []))
+    TIER_LIMITS = {"basic": 2, "premium": None}   # None = unlimited (display only)
+    limit = TIER_LIMITS.get(tier, 2)
+    if limit is not None:
+        st.caption(f"Tier: **{tier}** — {current} of {limit} highlights used.")
+    else:
+        st.caption(f"Tier: **{tier}** — {current} highlights (unlimited).")
+
+    title = st.text_input("Clip title", key="hl_title", placeholder="e.g. 40-yd dash")
+    video_file = st.file_uploader(
+        "Choose a video", type=["mp4", "mov", "webm"], key="hl_file"
+    )
+
+    if st.button("Add Highlight", key="hl_submit"):
+        if not video_file:
+            st.warning("Pick a video file first.")
+            return
+
+        try:
+            # ── Step 1: upload the file to disk, get back a URL ──
+            files = {"video": (video_file.name, video_file.getvalue())}
+            up = requests.post(
+                f"{API_URL}/api/athletes/{aid}/highlights/upload", files=files
+            )
+            if up.status_code != 200:
+                st.error(f"Upload failed ({up.status_code}): {up.text}")
+                return
+            clip_url = up.json()["url"]
+
+            # ── Step 2: attach the clip to the athlete's highlights ──
+            attach = requests.post(
+                f"{API_URL}/api/athletes/{aid}/highlights",
+                json={"title": title or "Untitled", "url": clip_url},
+            )
+
+            # 403 = tier gate. Not an error — an upgrade moment.
+            if attach.status_code == 403:
+                info = attach.json()
+                st.warning(
+                    f"🔒 You've reached the **{info.get('tier', tier)}** limit "
+                    f"of {info.get('limit', limit)} highlights. "
+                    f"Upgrade to add more."
+                )
+                return
+            if attach.status_code != 200:
+                st.error(f"Attach failed ({attach.status_code}): {attach.text}")
+                return
+
+            # Success — refresh session exactly like _patch does.
+            updated_user = attach.json()
+            updated_user["role"] = user.get("role", "athlete")
+            st.session_state.user = updated_user
+            st.session_state.role = updated_user["role"]
+            st.success("✅ Highlight added!")
+            st.switch_page("pages/RoleRouter.py")
+
+        except Exception as e:
+            st.error(f"Couldn't reach the server: {e}")
 # -- Back-compat shim ----------------------------------------------
 # The old standalone "Edit My Profile" entry point still works if anything
 # calls it — it just renders all four sections in sequence.

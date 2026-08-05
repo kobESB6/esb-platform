@@ -9,6 +9,7 @@ from athlete.edit_profile import (
     edit_in_the_classroom,
     edit_off_the_field,
     edit_contact,
+    upload_highlight,
 )
 
 def show_athlete_dashboard():
@@ -80,6 +81,8 @@ def show_athlete_dashboard():
             st.markdown(f"- [{clip.get('title', 'Untitled')}]({clip.get('url', '#')})")
     else:
         st.info("No highlights added yet.")
+    with st.expander("🎥 Add Highlight"):
+        upload_highlight(user)
 
     with st.expander("✏️ Edit On The Field"):
         edit_on_the_field(user)
