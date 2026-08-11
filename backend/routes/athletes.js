@@ -22,6 +22,25 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
+const { execFileSync } = require("child_process");
+
+// Read a video's duration in seconds via ffprobe. Returns a Number,
+// or null if the file isn't a readable video (ffprobe exits non-zero).
+function getVideoDuration(filePath) {
+  try {
+    const out = execFileSync("ffprobe", [
+      "-v", "error",
+      "-show_entries", "format=duration",
+      "-of", "default=noprint_wrappers=1:nokey=1",
+      filePath,
+    ]);
+    const seconds = parseFloat(out.toString().trim());
+    return Number.isFinite(seconds) ? seconds : null;
+  } catch (err) {
+    return null;
+  }
+}
+
 // NOTE: readAthletes/writeAthletes helpers are GONE — the DB is our store now.
 
 // Build the starting progression block — same engine as before
@@ -299,12 +318,36 @@ router.patch('/:id', async (req, res) => {
 // POST /api/athletes/:id/highlights/upload
 // Piece 1: receive a video file, store it on disk, return its URL.
 // Deliberately does NOT touch the DB yet — attach-to-profile is a separate step.
-router.post('/:id/highlights/upload', upload.single('video'), (req, res) => {
+router.post('/:id/highlights/upload', upload.single('video'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No video file received (field name must be "video")' });
   }
+
+  // Chunk 2: probe the saved file's duration.
+  const duration = getVideoDuration(req.file.path);
+
+  // Chunk 3a: reject non-videos (ffprobe couldn't read a duration).
+  if (duration === null) {
+    fs.unlinkSync(req.file.path);   // clean up the bad file — no orphan
+    return res.status(400).json({ error: 'That file is not a valid video.' });
+  }
+
+  // Chunk 3b: duration tier gate — basic capped at 10s, premium uncapped.
+  const user = await User.findByPk(req.params.id);
+  const tier = user?.tier || 'basic';                 // fail-safe: unknown → basic
+  const DURATION_LIMIT = { basic: 10, premium: Infinity };
+  const limit = DURATION_LIMIT[tier] ?? DURATION_LIMIT.basic;
+
+  if (duration > limit) {
+    fs.unlinkSync(req.file.path);   // don't keep a file we're rejecting
+    return res.status(403).json({
+      error: `Basic highlights are up to ${limit}s. Upgrade to premium to post longer film.`,
+      tier, limit, duration,
+    });
+  }
+
   const url = `/uploads/videos/${req.file.filename}`;
-  res.json({ url, filename: req.file.filename, size: req.file.size });
+  res.json({ url, filename: req.file.filename, size: req.file.size, duration });
 });
 
 // POST /api/athletes/:id/highlights
