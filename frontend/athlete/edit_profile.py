@@ -284,3 +284,49 @@ def render_edit_profile():
     st.markdown("### 📚 In The Classroom"); edit_in_the_classroom(user); st.divider()
     st.markdown("### 🌟 Off The Field");    edit_off_the_field(user);    st.divider()
     st.markdown("### 📇 Contact & Links");  edit_contact(user)
+# ==================================================================
+# HIGHLIGHTS CRUD — delete + edit-title (both free for all tiers)
+# Mirror upload_highlight's success/refresh pattern.
+# ==================================================================
+def delete_highlight(user, url):
+    aid = _athlete_id(user)
+    if not aid:
+        return
+    try:
+        r = requests.delete(
+            f"{API_URL}/api/athletes/{aid}/highlights",
+            json={"url": url},
+        )
+        if r.status_code == 200:
+            updated = r.json()
+            updated["role"] = user.get("role", "athlete")
+            st.session_state.user = updated
+            st.session_state.role = updated["role"]
+            st.success("🗑 Highlight deleted.")
+            st.switch_page("pages/RoleRouter.py")
+        else:
+            st.error(f"Delete failed ({r.status_code}): {r.text}")
+    except Exception as e:
+        st.error(f"Couldn't reach the server: {e}")
+
+
+def edit_highlight_title(user, url, new_title):
+    aid = _athlete_id(user)
+    if not aid:
+        return
+    try:
+        r = requests.patch(
+            f"{API_URL}/api/athletes/{aid}/highlights",
+            json={"url": url, "title": new_title},
+        )
+        if r.status_code == 200:
+            updated = r.json()
+            updated["role"] = user.get("role", "athlete")
+            st.session_state.user = updated
+            st.session_state.role = updated["role"]
+            st.success("✏️ Title updated.")
+            st.switch_page("pages/RoleRouter.py")
+        else:
+            st.error(f"Update failed ({r.status_code}): {r.text}")
+    except Exception as e:
+        st.error(f"Couldn't reach the server: {e}")

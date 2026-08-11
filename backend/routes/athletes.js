@@ -355,4 +355,75 @@ router.post('/:id/highlights', async (req, res) => {
     res.status(500).json({ error: 'Failed to add highlight' });
   }
 });
+
+// DELETE /api/athletes/:id/highlights
+// Remove a clip by url. Delete is FREE for all tiers (mission: athletes own their profile).
+router.delete('/:id/highlights', async (req, res) => {
+  try {
+    const user = await User.findByPk(req.params.id);
+    if (!user || user.role !== 'athlete') {
+      return res.status(404).json({ error: 'Athlete not found' });
+    }
+
+    const { url } = req.body;
+    if (!url) return res.status(400).json({ error: 'url is required to identify the clip' });
+
+    const existing = user.onTheField || {};
+    const currentHighlights = existing.highlights || [];
+
+    // Filter out the clip whose url matches. If none matched, say so.
+    const highlights = currentHighlights.filter((clip) => clip.url !== url);
+    if (highlights.length === currentHighlights.length) {
+      return res.status(404).json({ error: 'No highlight found with that url' });
+    }
+
+    // Whole-object merge — new array + new onTheField ref (Sequelize dirty-tracking).
+    user.onTheField = { ...existing, highlights };
+    await user.save();
+    const { password: _omit, ...safeUser } = user.toJSON();
+    res.json(safeUser);
+  } catch (err) {
+    console.error('DELETE /api/athletes/:id/highlights failed:', err);
+    res.status(500).json({ error: 'Failed to delete highlight' });
+  }
+});
+
+// PATCH /api/athletes/:id/highlights
+// Edit a clip's title, identified by url. Free for all tiers.
+router.patch('/:id/highlights', async (req, res) => {
+  try {
+    const user = await User.findByPk(req.params.id);
+    if (!user || user.role !== 'athlete') {
+      return res.status(404).json({ error: 'Athlete not found' });
+    }
+
+    const { url, title } = req.body;
+    if (!url) return res.status(400).json({ error: 'url is required to identify the clip' });
+    if (title === undefined) return res.status(400).json({ error: 'title is required' });
+
+    const existing = user.onTheField || {};
+    const currentHighlights = existing.highlights || [];
+
+    // Map: rewrite the matching clip's title, leave others untouched.
+    let found = false;
+    const highlights = currentHighlights.map((clip) => {
+      if (clip.url === url) {
+        found = true;
+        return { ...clip, title: title || 'Untitled' };
+      }
+      return clip;
+    });
+    if (!found) {
+      return res.status(404).json({ error: 'No highlight found with that url' });
+    }
+
+    user.onTheField = { ...existing, highlights };
+    await user.save();
+    const { password: _omit, ...safeUser } = user.toJSON();
+    res.json(safeUser);
+  } catch (err) {
+    console.error('PATCH /api/athletes/:id/highlights failed:', err);
+    res.status(500).json({ error: 'Failed to edit highlight' });
+  }
+});
 module.exports = router;

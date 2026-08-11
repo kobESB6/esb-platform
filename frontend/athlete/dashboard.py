@@ -10,6 +10,8 @@ from athlete.edit_profile import (
     edit_off_the_field,
     edit_contact,
     upload_highlight,
+    delete_highlight, 
+    edit_highlight_title,
 )
 
 def show_athlete_dashboard():
@@ -78,7 +80,44 @@ def show_athlete_dashboard():
     highlights = on_field.get("highlights", [])
     if highlights:
         for clip in highlights:
-            st.markdown(f"- [{clip.get('title', 'Untitled')}]({clip.get('url', '#')})")
+            url = clip.get("url", "")
+            title = clip.get("title", "Untitled")
+            edit_key = f"editing_{url}"
+            confirm_key = f"confirming_del_{url}"
+
+            col_title, col_edit, col_del = st.columns([6, 1, 1])
+            with col_title:
+                st.markdown(f"[{title}]({url})")
+            with col_edit:
+                if st.button("✏️", key=f"editbtn_{url}"):
+                    st.session_state[edit_key] = True
+            with col_del:
+                if st.button("🗑", key=f"delbtn_{url}"):
+                    st.session_state[confirm_key] = True
+
+            # Edit-title field — appears when ✏️ clicked
+            if st.session_state.get(edit_key):
+                new_title = st.text_input("New title", value=title, key=f"newtitle_{url}")
+                c1, c2 = st.columns([1, 1])
+                with c1:
+                    if st.button("Save", key=f"savetitle_{url}"):
+                        edit_highlight_title(user, url, new_title)
+                with c2:
+                    if st.button("Cancel", key=f"canceltitle_{url}"):
+                        st.session_state[edit_key] = False
+                        st.rerun()
+
+            # Delete confirmation — appears when 🗑 clicked
+            if st.session_state.get(confirm_key):
+                st.warning(f"Delete **{title}**? This can't be undone.")
+                c1, c2 = st.columns([1, 1])
+                with c1:
+                    if st.button("Yes, delete", key=f"confirmdel_{url}"):
+                        delete_highlight(user, url)
+                with c2:
+                    if st.button("Keep it", key=f"keepdel_{url}"):
+                        st.session_state[confirm_key] = False
+                        st.rerun()
     else:
         st.info("No highlights added yet.")
     with st.expander("🎥 Add Highlight"):
