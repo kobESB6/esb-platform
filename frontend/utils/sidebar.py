@@ -3,7 +3,8 @@ import streamlit as st
 def hide_default_nav():
     st.markdown("""
         <style>
-        [data-testid="stSidebarNav"] {display: none;}
+        [data-testid="stSidebar"] {display: none;}
+        [data-testid="stSidebarCollapsedControl"] {display: none;}
         </style>
     """, unsafe_allow_html=True)
 

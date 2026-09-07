@@ -73,11 +73,13 @@ router.post('/register', async (req, res) => {
       height, weight, school, graduationYear, gpa
     } = req.body;
 
-    // Required fields validation (unchanged)
+       // Required = identity + searchable essentials only (Option B, Aug 29 2026).
+    // gpa/height/weight deferred to profile-completion — lowers signup barrier
+    // for overlooked HS athletes. FLAGGED: revisit if completion/search-quality data warrants.
     if (!name || !email || !password || !primarySport || !position ||
-        !height || !weight || !school || !graduationYear || !gpa) {
+        !school || !graduationYear) {
       return res.status(400).json({
-        error: 'name, email, password, primarySport, position, height, weight, school, graduationYear, and gpa are required'
+        error: 'name, email, password, primarySport, position, school, and graduationYear are required'
       });
     }
 
@@ -107,15 +109,15 @@ router.post('/register', async (req, res) => {
       position,
       school,
       graduationYear,
-      gpa,
+      gpa: gpa || null,
 
       // JSONB — ON THE FIELD
       onTheField: {
         primarySport,
         sportsPlayed: [primarySport],
         position,
-        height,
-        weight,
+        height: height || null,
+        weight: weight || null,
         school,
         graduationYear,
         recruitingStatus: 'Uncommitted',
@@ -127,7 +129,7 @@ router.post('/register', async (req, res) => {
 
       // JSONB — IN THE CLASSROOM
       inTheClassroom: {
-        gpa,
+        gpa: gpa || null,
         sat: null,
         act: null,
         intendedMajor: '',

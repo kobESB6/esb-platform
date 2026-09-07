@@ -3,10 +3,10 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import streamlit as st
-from utils.sidebar import show_sidebar
+from utils.sidebar import hide_default_nav
 
 # Hide default nav
-show_sidebar()
+hide_default_nav()
 
 # Ensure session is valid
 if "role" not in st.session_state or not st.session_state.get("logged_in"):
