@@ -5,7 +5,7 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcrypt');
 const User = require('../models/User');   // ← replaces fs/path/JSON helpers
-
+const { attachMediaRoutes } = require('./mediaRoutes');
 // Progression engine — role-specific starting rank
 function createProgression(role) {
   const startingRank = { athlete: 'Rookie', coach: 'New Coach', legend: 'Alumni' };
@@ -242,4 +242,17 @@ router.patch('/:id', async (req, res) => {
     res.status(500).json({ error: 'Failed to update legend' });
   }
 });
+// ─── Media Archive CRUD — shared factory (see routes/mediaRoutes.js) ───
+// LEGENDS ARE UNLIMITED — no count cap, no duration cap. ffprobe still
+// validates uploads are real videos. Clips are tagged type:'video'.
+attachMediaRoutes(router, User, {
+  role: 'legend',
+  field: 'mediaArchive',
+  base: 'media',
+  countLimits: null,
+  durationLimits: null,
+  clipExtra: { type: 'video' },
+  labels: { durationUnit: 'clips', countLabel: 'Media', noun: 'media' },
+});
+
 module.exports = router;

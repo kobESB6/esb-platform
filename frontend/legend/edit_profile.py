@@ -214,3 +214,101 @@ def edit_mentorship(user):
             blob["mentorshipStyle"] = new_style
 
         _patch(legend_id, {"mentorship": blob} if blob else {}, user)
+
+# ==================================================================
+# MEDIA ARCHIVE CRUD — video upload + delete + edit-title
+# Mirrors athlete highlights. Writes to onTheField.mediaArchive via
+# /api/legends/:id/media. Upload is two-step (file → attach clip);
+# delete + edit-title are free for all tiers.
+# ==================================================================
+def upload_media(user):
+    lid = _legend_id(user)
+    if not lid:
+        return
+
+    current = len(user.get("onTheField", {}).get("mediaArchive", []))
+    st.caption(f"{current} clips in your archive — unlimited for Legends.")
+
+    title = st.text_input("Clip title", key="media_title", placeholder="e.g. State final, 2009")
+    video_file = st.file_uploader(
+        "Choose a video", type=["mp4", "mov", "webm"], key="media_file"
+    )
+
+    if st.button("Add to Media Archive", key="media_submit"):
+        if not video_file:
+            st.warning("Pick a video file first.")
+            return
+        try:
+            # Step 1: upload the file to disk, get back a URL.
+            files = {"video": (video_file.name, video_file.getvalue())}
+            up = requests.post(f"{API_URL}/api/legends/{lid}/media/upload", files=files)
+            if up.status_code != 200:
+                st.error(f"Upload failed ({up.status_code}): {up.text}")
+                return
+            clip_url = up.json()["url"]
+
+            # Step 2: attach the clip to the legend's mediaArchive.
+            attach = requests.post(
+                f"{API_URL}/api/legends/{lid}/media",
+                json={"title": title or "Untitled", "url": clip_url},
+            )
+            if attach.status_code == 403:   # tier gate — an upgrade moment, not an error
+                info = attach.json()
+                st.warning(
+                    f"🔒 You've reached the **{info.get('tier', tier)}** limit "
+                    f"of {info.get('limit', limit)} clips. Upgrade to add more."
+                )
+                return
+            if attach.status_code != 200:
+                st.error(f"Attach failed ({attach.status_code}): {attach.text}")
+                return
+
+            updated_user = attach.json()
+            updated_user["role"] = user.get("role", "legend")
+            st.session_state.user = updated_user
+            st.session_state.role = updated_user["role"]
+            st.success("✅ Media added!")
+            st.switch_page("pages/RoleRouter.py")
+        except Exception as e:
+            st.error(f"Couldn't reach the server: {e}")
+
+
+def delete_media(user, url):
+    lid = _legend_id(user)
+    if not lid:
+        return
+    try:
+        r = requests.delete(f"{API_URL}/api/legends/{lid}/media", json={"url": url})
+        if r.status_code == 200:
+            updated = r.json()
+            updated["role"] = user.get("role", "legend")
+            st.session_state.user = updated
+            st.session_state.role = updated["role"]
+            st.success("🗑 Media deleted.")
+            st.switch_page("pages/RoleRouter.py")
+        else:
+            st.error(f"Delete failed ({r.status_code}): {r.text}")
+    except Exception as e:
+        st.error(f"Couldn't reach the server: {e}")
+
+
+def edit_media_title(user, url, new_title):
+    lid = _legend_id(user)
+    if not lid:
+        return
+    try:
+        r = requests.patch(
+            f"{API_URL}/api/legends/{lid}/media",
+            json={"url": url, "title": new_title},
+        )
+        if r.status_code == 200:
+            updated = r.json()
+            updated["role"] = user.get("role", "legend")
+            st.session_state.user = updated
+            st.session_state.role = updated["role"]
+            st.success("✏️ Title updated.")
+            st.switch_page("pages/RoleRouter.py")
+        else:
+            st.error(f"Update failed ({r.status_code}): {r.text}")
+    except Exception as e:
+        st.error(f"Couldn't reach the server: {e}")

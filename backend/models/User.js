@@ -32,6 +32,8 @@ const User = sequelize.define('User', {
   school:         { type: DataTypes.STRING, allowNull: true },
   graduationYear: { type: DataTypes.INTEGER, allowNull: true },
   gpa:            { type: DataTypes.DECIMAL(3, 2), allowNull: true },
+  heightInches:   { type: DataTypes.INTEGER, allowNull: true },   // total inches (5'7" = 67) — sortable/searchable
+  weightLbs:      { type: DataTypes.INTEGER, allowNull: true },   // pounds — sortable/searchable
     coachType:      { type: DataTypes.STRING, allowNull: true },   // ← add here: 'highschool' | 'college', null for non-coaches
  
 
@@ -58,6 +60,8 @@ const User = sequelize.define('User', {
     { fields: ['graduationYear'] }, // fast recruiting-class filtering
     { fields: ['sportsPlayed'], using: 'gin' },   // ← multi-sport search
     { fields: ['coachType'] },   // fast "get all college coaches"
+    { fields: ['heightInches'] },   // recruiting: filter by height
+    { fields: ['weightLbs'] },      // recruiting: filter by weight
   ],
 });
 

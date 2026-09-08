@@ -14,6 +14,8 @@ from athlete.edit_profile import (
     edit_highlight_title,
 )
 
+MEDIA_BASE = "http://localhost:3000"   # backend origin that serves /uploads
+
 def show_athlete_dashboard():
 
     # -- Access Control --------------------------------------------
@@ -60,8 +62,11 @@ def show_athlete_dashboard():
     sports_played = user.get("sportsPlayed") or on_field.get("sportsPlayed", [])
     school = user.get("school") or on_field.get("school", "Not set")
     grad_year = user.get("graduationYear") or on_field.get("graduationYear", "Not set")
-    height = on_field.get("height", "Not set")
-    weight = on_field.get("weight", "Not set")
+    # column-first (heightInches/weightLbs); format inches -> ft/in for display
+    _h_in = user.get("heightInches")
+    height = f"{_h_in // 12}'{_h_in % 12}\"" if _h_in else "Not set"
+    _w_lbs = user.get("weightLbs")
+    weight = f"{_w_lbs} lbs" if _w_lbs else "Not set"
     recruiting_status = on_field.get("recruitingStatus", "Not set")
 
     col1, col2 = st.columns(2)
@@ -69,7 +74,7 @@ def show_athlete_dashboard():
         st.markdown(f"**Primary Sport:** {primary_sport}")
         st.markdown(f"**Position:** {position}")
         st.markdown(f"**Height:** {height}")
-        st.markdown(f"**Weight:** {weight} lbs" if weight != "Not set" else "**Weight:** Not set")
+        st.markdown(f"**Weight:** {weight}")
     with col2:
         st.markdown(f"**Sports Played:** {', '.join(sports_played) if sports_played else 'Not set'}")
         st.markdown(f"**School:** {school}")
@@ -82,42 +87,50 @@ def show_athlete_dashboard():
         for clip in highlights:
             url = clip.get("url", "")
             title = clip.get("title", "Untitled")
+            # Clips store a RELATIVE url (/uploads/...); the backend serves them at
+            # MEDIA_BASE. Absolute URL so the preview AND title link hit the API host.
+            full_url = url if url.startswith("http") else f"{MEDIA_BASE}{url}"
             edit_key = f"editing_{url}"
             confirm_key = f"confirming_del_{url}"
 
-            col_title, col_edit, col_del = st.columns([6, 1, 1])
-            with col_title:
-                st.markdown(f"[{title}]({url})")
-            with col_edit:
-                if st.button("✏️", key=f"editbtn_{url}"):
-                    st.session_state[edit_key] = True
-            with col_del:
-                if st.button("🗑", key=f"delbtn_{url}"):
-                    st.session_state[confirm_key] = True
+            thumb_col, body_col = st.columns([1, 3])
+            with thumb_col:
+                if url:
+                    st.video(full_url)   # poster frame = thumbnail; plays on click
+            with body_col:
+                col_title, col_edit, col_del = st.columns([6, 1, 1])
+                with col_title:
+                    st.markdown(f"[{title}]({full_url})")
+                with col_edit:
+                    if st.button("✏️", key=f"editbtn_{url}"):
+                        st.session_state[edit_key] = True
+                with col_del:
+                    if st.button("🗑", key=f"delbtn_{url}"):
+                        st.session_state[confirm_key] = True
 
-            # Edit-title field — appears when ✏️ clicked
-            if st.session_state.get(edit_key):
-                new_title = st.text_input("New title", value=title, key=f"newtitle_{url}")
-                c1, c2 = st.columns([1, 1])
-                with c1:
-                    if st.button("Save", key=f"savetitle_{url}"):
-                        edit_highlight_title(user, url, new_title)
-                with c2:
-                    if st.button("Cancel", key=f"canceltitle_{url}"):
-                        st.session_state[edit_key] = False
-                        st.rerun()
+                # Edit-title field — appears when ✏️ clicked
+                if st.session_state.get(edit_key):
+                    new_title = st.text_input("New title", value=title, key=f"newtitle_{url}")
+                    c1, c2 = st.columns([1, 1])
+                    with c1:
+                        if st.button("Save", key=f"savetitle_{url}"):
+                            edit_highlight_title(user, url, new_title)
+                    with c2:
+                        if st.button("Cancel", key=f"canceltitle_{url}"):
+                            st.session_state[edit_key] = False
+                            st.rerun()
 
-            # Delete confirmation — appears when 🗑 clicked
-            if st.session_state.get(confirm_key):
-                st.warning(f"Delete **{title}**? This can't be undone.")
-                c1, c2 = st.columns([1, 1])
-                with c1:
-                    if st.button("Yes, delete", key=f"confirmdel_{url}"):
-                        delete_highlight(user, url)
-                with c2:
-                    if st.button("Keep it", key=f"keepdel_{url}"):
-                        st.session_state[confirm_key] = False
-                        st.rerun()
+                # Delete confirmation — appears when 🗑 clicked
+                if st.session_state.get(confirm_key):
+                    st.warning(f"Delete **{title}**? This can't be undone.")
+                    c1, c2 = st.columns([1, 1])
+                    with c1:
+                        if st.button("Yes, delete", key=f"confirmdel_{url}"):
+                            delete_highlight(user, url)
+                    with c2:
+                        if st.button("Keep it", key=f"keepdel_{url}"):
+                            st.session_state[confirm_key] = False
+                            st.rerun()
     else:
         st.info("No highlights added yet.")
     with st.expander("🎥 Add Highlight"):

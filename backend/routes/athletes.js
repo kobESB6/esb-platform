@@ -6,41 +6,7 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcrypt');
 const User = require('../models/User');   // ← replaces fs/path/JSON helpers
-const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
-// ─── Video upload storage config (highlights) ───
-const VIDEO_DIR = path.join(__dirname, "..", "uploads", "videos");
-fs.mkdirSync(VIDEO_DIR, { recursive: true });   // self-heals dir on fresh clone
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, VIDEO_DIR),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);   // preserve .mp4 / .mov
-    cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
-  },
-});
-const upload = multer({ storage });
-
-const { execFileSync } = require("child_process");
-
-// Read a video's duration in seconds via ffprobe. Returns a Number,
-// or null if the file isn't a readable video (ffprobe exits non-zero).
-function getVideoDuration(filePath) {
-  try {
-    const out = execFileSync("ffprobe", [
-      "-v", "error",
-      "-show_entries", "format=duration",
-      "-of", "default=noprint_wrappers=1:nokey=1",
-      filePath,
-    ]);
-    const seconds = parseFloat(out.toString().trim());
-    return Number.isFinite(seconds) ? seconds : null;
-  } catch (err) {
-    return null;
-  }
-}
-
+const { attachMediaRoutes } = require('./mediaRoutes');
 // NOTE: readAthletes/writeAthletes helpers are GONE — the DB is our store now.
 
 // Build the starting progression block — same engine as before
@@ -260,6 +226,7 @@ router.patch('/:id', async (req, res) => {
     const {
       // promoted scalar columns:
       name, primarySport, position, school, graduationYear, gpa, profilePhoto,
+      heightInches, weightLbs,
       // array column:
       sportsPlayed, addSport,
       // JSONB blobs:
@@ -275,6 +242,8 @@ router.patch('/:id', async (req, res) => {
     if (graduationYear !== undefined) user.graduationYear = graduationYear;
     if (gpa            !== undefined) user.gpa            = gpa;
     if (profilePhoto   !== undefined) user.profilePhoto   = profilePhoto;
+    if (heightInches   !== undefined) user.heightInches   = heightInches;
+    if (weightLbs      !== undefined) user.weightLbs      = weightLbs;
 
     // ─── CATEGORY 2: array column (sportsPlayed) ───
     // Two ways to touch it:
@@ -317,158 +286,16 @@ router.patch('/:id', async (req, res) => {
     res.status(500).json({ error: 'Failed to update athlete' });
   }
 });
-// POST /api/athletes/:id/highlights/upload
-// Piece 1: receive a video file, store it on disk, return its URL.
-// Deliberately does NOT touch the DB yet — attach-to-profile is a separate step.
-router.post('/:id/highlights/upload', upload.single('video'), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'No video file received (field name must be "video")' });
-  }
-
-  // Chunk 2: probe the saved file's duration.
-  const duration = getVideoDuration(req.file.path);
-
-  // Chunk 3a: reject non-videos (ffprobe couldn't read a duration).
-  if (duration === null) {
-    fs.unlinkSync(req.file.path);   // clean up the bad file — no orphan
-    return res.status(400).json({ error: 'That file is not a valid video.' });
-  }
-
-  // Chunk 3b: duration tier gate — basic capped at 10s, premium uncapped.
-  const user = await User.findByPk(req.params.id);
-  const tier = user?.tier || 'basic';                 // fail-safe: unknown → basic
-  const DURATION_LIMIT = { basic: 10, premium: Infinity };
-  const limit = DURATION_LIMIT[tier] ?? DURATION_LIMIT.basic;
-
-  if (duration > limit) {
-    fs.unlinkSync(req.file.path);   // don't keep a file we're rejecting
-    return res.status(403).json({
-      error: `Basic highlights are up to ${limit}s. Upgrade to premium to post longer film.`,
-      tier, limit, duration,
-    });
-  }
-
-  const url = `/uploads/videos/${req.file.filename}`;
-  res.json({ url, filename: req.file.filename, size: req.file.size, duration });
+// ─── Highlights CRUD — shared factory (see routes/mediaRoutes.js) ───
+// Athlete keeps its tier caps: basic = 2 clips, 10s each; premium unlimited.
+attachMediaRoutes(router, User, {
+  role: 'athlete',
+  field: 'highlights',
+  base: 'highlights',
+  countLimits: { basic: 2, premium: Infinity },
+  durationLimits: { basic: 10, premium: Infinity },
+  clipExtra: {},
+  labels: { durationUnit: 'highlights', countLabel: 'Highlight', noun: 'highlight' },
 });
 
-// POST /api/athletes/:id/highlights
-// Piece 2: append a clip object to onTheField.highlights.
-// (Tier gate lands here in piece 3.)
-router.post('/:id/highlights', async (req, res) => {
-  try {
-    const user = await User.findByPk(req.params.id);
-    if (!user || user.role !== 'athlete') {
-      return res.status(404).json({ error: 'Athlete not found' });
-    }
-
-    const { title, url } = req.body;
-    if (!url) return res.status(400).json({ error: 'url is required' });
-
-    const clip = {
-      title: title || 'Untitled',
-      url,
-      source: 'upload',
-      uploadedAt: new Date().toISOString(),
-    };
-
-    const existing = user.onTheField || {};
-    const currentHighlights = existing.highlights || [];
-
-    // ─── Piece 3: tier gate (count-based) ───
-    // Basic athletes are capped; premium is unlimited (for now).
-    const TIER_LIMITS = { basic: 2, premium: Infinity };
-    const limit = TIER_LIMITS[user.tier] ?? TIER_LIMITS.basic;   // unknown tier → most restrictive
-    if (currentHighlights.length >= limit) {
-      return res.status(403).json({
-        error: `Highlight limit reached for ${user.tier} tier (max ${limit}). Upgrade to add more.`,
-        tier: user.tier,
-        limit,
-        current: currentHighlights.length,
-      });
-    }
-
-    // Whole-object merge — same pattern as socialLinks.
-    // Double-spread: new array (append) + new onTheField ref (Sequelize dirty-tracking).
-    const highlights = [...currentHighlights, clip];
-    user.onTheField = { ...existing, highlights };
-    await user.save();
-    const { password: _omit, ...safeUser } = user.toJSON();
-    res.json(safeUser);
-  } catch (err) {
-    console.error('POST /api/athletes/:id/highlights failed:', err);
-    res.status(500).json({ error: 'Failed to add highlight' });
-  }
-});
-
-// DELETE /api/athletes/:id/highlights
-// Remove a clip by url. Delete is FREE for all tiers (mission: athletes own their profile).
-router.delete('/:id/highlights', async (req, res) => {
-  try {
-    const user = await User.findByPk(req.params.id);
-    if (!user || user.role !== 'athlete') {
-      return res.status(404).json({ error: 'Athlete not found' });
-    }
-
-    const { url } = req.body;
-    if (!url) return res.status(400).json({ error: 'url is required to identify the clip' });
-
-    const existing = user.onTheField || {};
-    const currentHighlights = existing.highlights || [];
-
-    // Filter out the clip whose url matches. If none matched, say so.
-    const highlights = currentHighlights.filter((clip) => clip.url !== url);
-    if (highlights.length === currentHighlights.length) {
-      return res.status(404).json({ error: 'No highlight found with that url' });
-    }
-
-    // Whole-object merge — new array + new onTheField ref (Sequelize dirty-tracking).
-    user.onTheField = { ...existing, highlights };
-    await user.save();
-    const { password: _omit, ...safeUser } = user.toJSON();
-    res.json(safeUser);
-  } catch (err) {
-    console.error('DELETE /api/athletes/:id/highlights failed:', err);
-    res.status(500).json({ error: 'Failed to delete highlight' });
-  }
-});
-
-// PATCH /api/athletes/:id/highlights
-// Edit a clip's title, identified by url. Free for all tiers.
-router.patch('/:id/highlights', async (req, res) => {
-  try {
-    const user = await User.findByPk(req.params.id);
-    if (!user || user.role !== 'athlete') {
-      return res.status(404).json({ error: 'Athlete not found' });
-    }
-
-    const { url, title } = req.body;
-    if (!url) return res.status(400).json({ error: 'url is required to identify the clip' });
-    if (title === undefined) return res.status(400).json({ error: 'title is required' });
-
-    const existing = user.onTheField || {};
-    const currentHighlights = existing.highlights || [];
-
-    // Map: rewrite the matching clip's title, leave others untouched.
-    let found = false;
-    const highlights = currentHighlights.map((clip) => {
-      if (clip.url === url) {
-        found = true;
-        return { ...clip, title: title || 'Untitled' };
-      }
-      return clip;
-    });
-    if (!found) {
-      return res.status(404).json({ error: 'No highlight found with that url' });
-    }
-
-    user.onTheField = { ...existing, highlights };
-    await user.save();
-    const { password: _omit, ...safeUser } = user.toJSON();
-    res.json(safeUser);
-  } catch (err) {
-    console.error('PATCH /api/athletes/:id/highlights failed:', err);
-    res.status(500).json({ error: 'Failed to edit highlight' });
-  }
-});
 module.exports = router;

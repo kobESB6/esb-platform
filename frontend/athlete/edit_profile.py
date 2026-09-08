@@ -69,6 +69,10 @@ def edit_on_the_field(user):
     current_primary = user.get("primarySport")   or on_field.get("primarySport", "")
     current_pos     = user.get("position")       or on_field.get("position", "")
     current_grad    = user.get("graduationYear") or on_field.get("graduationYear", None)
+    current_h_in    = user.get("heightInches")
+    cur_feet        = current_h_in // 12 if current_h_in else 0
+    cur_inch        = current_h_in % 12 if current_h_in else 0
+    current_weight  = user.get("weightLbs") or 0
 
     with st.form("edit_onfield_form"):
         col1, col2 = st.columns(2)
@@ -81,6 +85,18 @@ def edit_on_the_field(user):
             new_pos   = st.text_input("Position", value=current_pos)
             add_sport = st.text_input("Add another sport (optional)", value="",
                                       help="Adds one more sport beyond your primary")
+
+        st.markdown("**Measurables**")
+        mcol1, mcol2, mcol3 = st.columns(3)
+        with mcol1:
+            new_feet = st.number_input("Height (ft)", value=int(cur_feet),
+                                       min_value=0, max_value=8, step=1)
+        with mcol2:
+            new_inch = st.number_input("Height (in)", value=int(cur_inch),
+                                       min_value=0, max_value=11, step=1)
+        with mcol3:
+            new_weight = st.number_input("Weight (lbs)", value=int(current_weight),
+                                         min_value=0, max_value=500, step=1)
         saved = st.form_submit_button("Save On The Field")
 
     if saved:
@@ -93,6 +109,13 @@ def edit_on_the_field(user):
             payload["graduationYear"] = int(new_grad)
         if add_sport.strip():
             payload["addSport"] = add_sport.strip()
+
+        new_h_in = int(new_feet) * 12 + int(new_inch)
+        if new_h_in != (current_h_in or 0):
+            payload["heightInches"] = new_h_in if new_h_in > 0 else None
+        if int(new_weight) != (current_weight or 0):
+            payload["weightLbs"] = int(new_weight) if new_weight > 0 else None
+
         _patch(athlete_id, payload, user)
 
 

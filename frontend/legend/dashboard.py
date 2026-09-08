@@ -4,9 +4,17 @@
 
 import streamlit as st
 import requests
-from legend.edit_profile import edit_on_the_field, edit_off_the_field, edit_mentorship
+from legend.edit_profile import (
+    edit_on_the_field,
+    edit_off_the_field,
+    edit_mentorship,
+    upload_media,
+    delete_media,
+    edit_media_title,
+)
 
 API_URL = "http://localhost:3000/api"
+MEDIA_BASE = API_URL.replace("/api", "")   # backend origin that serves /uploads
 
 def show_legend_dashboard():
 
@@ -45,8 +53,8 @@ def show_legend_dashboard():
     st.subheader("🏟️ On The Field")
 
     on_field = user.get("onTheField", {})
-    primary_sport = on_field.get("primarySport", "Not set")
-    sports_played = on_field.get("sportsPlayed", [])
+    primary_sport = user.get("primarySport") or on_field.get("primarySport", "Not set")
+    sports_played = user.get("sportsPlayed") or on_field.get("sportsPlayed", [])
     highest_level = on_field.get("highestLevelPlayed") or "Not set"
     position   = user.get("position") or "Not set"
     school     = user.get("school") or "Not set"
@@ -68,13 +76,61 @@ def show_legend_dashboard():
     else:
         st.info("No career history added yet.")
 
-    st.markdown("**Media Archive**")
+    st.markdown("**🎥 Media Archive**")
     media_archive = on_field.get("mediaArchive", [])
     if media_archive:
         for item in media_archive:
-            st.markdown(f"- [{item.get('title')}]({item.get('url')}) · {item.get('type')} · Source: {item.get('source')}")
+            url = item.get("url", "")
+            title = item.get("title", "Untitled")
+            # Clips store a RELATIVE url (/uploads/...); the backend serves them
+            # at MEDIA_BASE. Build an absolute URL so the inline preview AND the
+            # title link resolve to the API host, not the Streamlit host.
+            full_url = url if url.startswith("http") else f"{MEDIA_BASE}{url}"
+            edit_key = f"editing_media_{url}"
+            confirm_key = f"confirming_del_media_{url}"
+
+            thumb_col, body_col = st.columns([1, 3])
+            with thumb_col:
+                if url:
+                    st.video(full_url)   # poster frame = thumbnail; plays on click
+            with body_col:
+                col_title, col_edit, col_del = st.columns([6, 1, 1])
+                with col_title:
+                    st.markdown(f"[{title}]({full_url})")
+                with col_edit:
+                    if st.button("✏️", key=f"editbtn_media_{url}"):
+                        st.session_state[edit_key] = True
+                with col_del:
+                    if st.button("🗑", key=f"delbtn_media_{url}"):
+                        st.session_state[confirm_key] = True
+
+                # Edit-title field — appears when ✏️ clicked
+                if st.session_state.get(edit_key):
+                    new_title = st.text_input("New title", value=title, key=f"newtitle_media_{url}")
+                    c1, c2 = st.columns([1, 1])
+                    with c1:
+                        if st.button("Save", key=f"savetitle_media_{url}"):
+                            edit_media_title(user, url, new_title)
+                    with c2:
+                        if st.button("Cancel", key=f"canceltitle_media_{url}"):
+                            st.session_state[edit_key] = False
+                            st.rerun()
+
+                # Delete confirmation — appears when 🗑 clicked
+                if st.session_state.get(confirm_key):
+                    st.warning(f"Delete **{title}**? This can't be undone.")
+                    c1, c2 = st.columns([1, 1])
+                    with c1:
+                        if st.button("Yes, delete", key=f"confirmdel_media_{url}"):
+                            delete_media(user, url)
+                    with c2:
+                        if st.button("Keep it", key=f"keepdel_media_{url}"):
+                            st.session_state[confirm_key] = False
+                            st.rerun()
     else:
         st.info("No media uploaded yet.")
+    with st.expander("🎥 Add Media"):
+        upload_media(user)
 
     with st.expander("✏️ Edit On The Field"):
         edit_on_the_field(user)
