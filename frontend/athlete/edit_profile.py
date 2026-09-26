@@ -13,6 +13,10 @@
 
 import streamlit as st
 import requests
+from utils.auth import auth_headers
+def _authpost(*a, **k):   k.setdefault('headers', auth_headers()); return requests.post(*a, **k)
+def _authpatch(*a, **k):  k.setdefault('headers', auth_headers()); return requests.patch(*a, **k)
+def _authdelete(*a, **k): k.setdefault('headers', auth_headers()); return requests.delete(*a, **k)
 
 API_URL = "http://localhost:3000"   # same base as utils/auth.py (no trailing /api)
 
@@ -26,7 +30,7 @@ def _patch(athlete_id, payload, user):
         st.info("No changes to save.")
         return False
     try:
-        response = requests.patch(f"{API_URL}/api/athletes/{athlete_id}", json=payload)
+        response = _authpatch(f"{API_URL}/api/athletes/{athlete_id}", json=payload)
         if response.status_code == 200:
             updated_user = response.json()
             # PATCH response drops `role` (not a DB column) — re-attach like auth.py does
@@ -259,7 +263,7 @@ def upload_highlight(user):
         try:
             # ── Step 1: upload the file to disk, get back a URL ──
             files = {"video": (video_file.name, video_file.getvalue())}
-            up = requests.post(
+            up = _authpost(
                 f"{API_URL}/api/athletes/{aid}/highlights/upload", files=files
             )
             if up.status_code != 200:
@@ -268,7 +272,7 @@ def upload_highlight(user):
             clip_url = up.json()["url"]
 
             # ── Step 2: attach the clip to the athlete's highlights ──
-            attach = requests.post(
+            attach = _authpost(
                 f"{API_URL}/api/athletes/{aid}/highlights",
                 json={"title": title or "Untitled", "url": clip_url},
             )
@@ -316,7 +320,7 @@ def delete_highlight(user, url):
     if not aid:
         return
     try:
-        r = requests.delete(
+        r = _authdelete(
             f"{API_URL}/api/athletes/{aid}/highlights",
             json={"url": url},
         )
@@ -338,7 +342,7 @@ def edit_highlight_title(user, url, new_title):
     if not aid:
         return
     try:
-        r = requests.patch(
+        r = _authpatch(
             f"{API_URL}/api/athletes/{aid}/highlights",
             json={"url": url, "title": new_title},
         )

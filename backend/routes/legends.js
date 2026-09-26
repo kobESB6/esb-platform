@@ -5,6 +5,8 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcrypt');
 const User = require('../models/User');   // ← replaces fs/path/JSON helpers
+const { sanitizeUser } = require('../utils/sanitizeUser');
+const { signToken, requireAuth, requireSelf } = require('../middleware/auth');
 const { attachMediaRoutes } = require('./mediaRoutes');
 // Progression engine — role-specific starting rank
 function createProgression(role) {
@@ -107,7 +109,7 @@ router.post('/register', async (req, res) => {
     const { password: _, ...legendWithoutPassword } = newLegend.toJSON();
     res.status(201).json({
       message: 'Legend profile created successfully',
-      legend: legendWithoutPassword
+      legend: sanitizeUser(legendWithoutPassword)
     });
 
   } catch (error) {
@@ -136,7 +138,7 @@ router.post('/login', async (req, res) => {
     }
 
     const { password: _, ...legendWithoutPassword } = legend.toJSON();
-    res.status(200).json({ message: 'Login successful!', legend: legendWithoutPassword });
+    res.status(200).json({ message: 'Login successful!', token: signToken(legendWithoutPassword), legend: sanitizeUser(legendWithoutPassword) });
 
   } catch (error) {
     console.error('Legend login error:', error);
@@ -145,7 +147,7 @@ router.post('/login', async (req, res) => {
 });
 
 // GET /api/legends
-router.get('/', async (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
   try {
     const legends = await User.findAll({
       where: { role: 'legend' },
@@ -158,7 +160,7 @@ router.get('/', async (req, res) => {
 });
 
 // GET /api/legends/:id
-router.get('/:id', async (req, res) => {
+router.get('/:id', requireAuth, async (req, res) => {
   try {
     const legend = await User.findByPk(req.params.id, {
       attributes: { exclude: ['password'] }
@@ -173,7 +175,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // PATCH /api/legends/:id — partial update of a legend profile
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', requireAuth, requireSelf, async (req, res) => {
   try {
     // 1. Find the legend by primary key (the UUID in the URL).
     const user = await User.findByPk(req.params.id);

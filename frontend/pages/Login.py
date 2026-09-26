@@ -28,12 +28,13 @@ remember = st.checkbox("Remember me")
 
 # --- Form Submission ---
 if st.button("Log In", key="login_button"):
-    user = authenticate(username, password)
+    user, token = authenticate(username, password)
     
     if user:
         st.success(f"Welcome back, {user['name']}!")
         st.session_state.user = user
         st.session_state.role = user["role"]
+        st.session_state.token = token
         st.session_state.logged_in = True
         if remember:
             st.session_state.remember = True

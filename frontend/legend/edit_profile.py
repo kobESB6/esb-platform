@@ -15,6 +15,10 @@
 
 import streamlit as st
 import requests
+from utils.auth import auth_headers
+def _authpost(*a, **k):   k.setdefault('headers', auth_headers()); return requests.post(*a, **k)
+def _authpatch(*a, **k):  k.setdefault('headers', auth_headers()); return requests.patch(*a, **k)
+def _authdelete(*a, **k): k.setdefault('headers', auth_headers()); return requests.delete(*a, **k)
 
 API_URL = "http://localhost:3000"   # same base as utils/auth.py (no trailing /api)
 
@@ -26,7 +30,7 @@ def _patch(legend_id, payload, user):
         st.info("No changes to save.")
         return False
     try:
-        response = requests.patch(f"{API_URL}/api/legends/{legend_id}", json=payload)
+        response = _authpatch(f"{API_URL}/api/legends/{legend_id}", json=payload)
         if response.status_code == 200:
             updated_user = response.json()
             # PATCH response drops `role` (not a DB column) — re-attach like auth.py does
@@ -241,14 +245,14 @@ def upload_media(user):
         try:
             # Step 1: upload the file to disk, get back a URL.
             files = {"video": (video_file.name, video_file.getvalue())}
-            up = requests.post(f"{API_URL}/api/legends/{lid}/media/upload", files=files)
+            up = _authpost(f"{API_URL}/api/legends/{lid}/media/upload", files=files)
             if up.status_code != 200:
                 st.error(f"Upload failed ({up.status_code}): {up.text}")
                 return
             clip_url = up.json()["url"]
 
             # Step 2: attach the clip to the legend's mediaArchive.
-            attach = requests.post(
+            attach = _authpost(
                 f"{API_URL}/api/legends/{lid}/media",
                 json={"title": title or "Untitled", "url": clip_url},
             )
@@ -278,7 +282,7 @@ def delete_media(user, url):
     if not lid:
         return
     try:
-        r = requests.delete(f"{API_URL}/api/legends/{lid}/media", json={"url": url})
+        r = _authdelete(f"{API_URL}/api/legends/{lid}/media", json={"url": url})
         if r.status_code == 200:
             updated = r.json()
             updated["role"] = user.get("role", "legend")
@@ -297,7 +301,7 @@ def edit_media_title(user, url, new_title):
     if not lid:
         return
     try:
-        r = requests.patch(
+        r = _authpatch(
             f"{API_URL}/api/legends/{lid}/media",
             json={"url": url, "title": new_title},
         )

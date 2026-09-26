@@ -2,6 +2,7 @@
 # Authentication utility — tries all three user type endpoints
 # Returns the matched user with their correct role attached
 import requests
+import streamlit as st
 
 API_URL = "http://localhost:3000"
 
@@ -25,12 +26,12 @@ def authenticate(email, password):
                 user = data[endpoint["key"]]
                 # Attach the role so RoleRouter knows where to send them
                 user["role"] = endpoint["role"]
-                return user
+                return user, data.get("token")
         except Exception as e:
             print(f"Auth error on {endpoint['url']}: {e}")
             continue
     # No match found across any endpoint
-    return None
+    return None, None
 
 
 def create_user(username, password, name, role, extra):
@@ -59,3 +60,8 @@ def create_user(username, password, name, role, extra):
     except Exception as e:
         print(f"Registration error: {e}")
         return False
+
+
+def auth_headers():
+    token = st.session_state.get('token', '')
+    return {'Authorization': f'Bearer {token}'} if token else {}

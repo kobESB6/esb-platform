@@ -6,6 +6,8 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcrypt');
 const User = require('../models/User');   // ← replaces fs/path/JSON helpers
+const { sanitizeUser } = require('../utils/sanitizeUser');
+const { signToken, requireAuth, requireSelf } = require('../middleware/auth');
 const { attachMediaRoutes } = require('./mediaRoutes');
 // NOTE: readAthletes/writeAthletes helpers are GONE — the DB is our store now.
 
@@ -139,7 +141,7 @@ router.post('/register', async (req, res) => {
 
     res.status(201).json({
       message: 'Athlete profile created successfully!',
-      athlete: athleteWithoutPassword
+      athlete: sanitizeUser(athleteWithoutPassword)
     });
 
   } catch (error) {
@@ -170,7 +172,8 @@ router.post('/login', async (req, res) => {
     const { password: _, ...athleteWithoutPassword } = athlete.toJSON();
     res.status(200).json({
       message: 'Login successful!',
-      athlete: athleteWithoutPassword
+      token: signToken(athleteWithoutPassword),
+      athlete: sanitizeUser(athleteWithoutPassword)
     });
 
   } catch (error) {
@@ -180,7 +183,7 @@ router.post('/login', async (req, res) => {
 });
 
 // GET /api/athletes — all athletes, no passwords
-router.get('/', async (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
   try {
     const athletes = await User.findAll({
       where: { role: 'athlete' },
@@ -193,7 +196,7 @@ router.get('/', async (req, res) => {
 });
 
 // GET /api/athletes/:id — single athlete by id
-router.get('/:id', async (req, res) => {
+router.get('/:id', requireAuth, async (req, res) => {
   try {
     const athlete = await User.findByPk(req.params.id, {
       attributes: { exclude: ['password'] }
@@ -209,7 +212,7 @@ router.get('/:id', async (req, res) => {
 // PATCH /api/athletes/:id
 // Partial update — send ONLY the fields you want to change.
 // Merges into existing data so untouched fields (and other blobs) survive.
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', requireAuth, requireSelf, async (req, res) => {
   try {
     // 1. Find the athlete. findByPk = "find by primary key" (the UUID).
     const user = await User.findByPk(req.params.id);

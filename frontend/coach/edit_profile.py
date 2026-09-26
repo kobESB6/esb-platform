@@ -12,6 +12,10 @@
 
 import streamlit as st
 import requests
+from utils.auth import auth_headers
+def _authpost(*a, **k):   k.setdefault('headers', auth_headers()); return requests.post(*a, **k)
+def _authpatch(*a, **k):  k.setdefault('headers', auth_headers()); return requests.patch(*a, **k)
+def _authdelete(*a, **k): k.setdefault('headers', auth_headers()); return requests.delete(*a, **k)
 
 API_URL = "http://localhost:3000"  #  same base as athlete edit + auth.py
 
@@ -24,7 +28,7 @@ def _patch(coach_id, payload, user):
         st.info("No changes to save")
         return False
     try: 
-        response = requests.patch(f"{API_URL}/api/coaches/{coach_id}", json=payload)
+        response = _authpatch(f"{API_URL}/api/coaches/{coach_id}", json=payload)
         if response.status_code == 200:
             updated_user = response.json()
             # PATCH response drops `role`  (not a DB column) - re-attach, like auth.py

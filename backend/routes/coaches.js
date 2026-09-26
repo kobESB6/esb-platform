@@ -7,6 +7,8 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const { v4: uuidv4 } = require('uuid');
 const User = require('../models/User');   // replaces fs/path/JSON helpers
+const { sanitizeUser } = require('../utils/sanitizeUser');
+const { signToken, requireAuth, requireSelf } = require('../middleware/auth');
 
 // Progression engine — unchanged
 function createProgression(role) {
@@ -157,7 +159,7 @@ router.post('/register', async (req, res) => {
     const { password: _, ...coachWithoutPassword } = newCoach.toJSON();
     res.status(201).json({
       message: 'Coach profile created successfully!',
-      coach: coachWithoutPassword
+      coach: sanitizeUser(coachWithoutPassword)
     });
 
   } catch (error) {
@@ -186,7 +188,7 @@ router.post('/login', async (req, res) => {
     }
 
     const { password: _, ...coachWithoutPassword } = coach.toJSON();
-    res.status(200).json({ message: 'Login successful!', coach: coachWithoutPassword });
+    res.status(200).json({ message: 'Login successful!', token: signToken(coachWithoutPassword), coach: sanitizeUser(coachWithoutPassword) });
 
   } catch (error) {
     console.error('Coach login error:', error);   // ← fixed: was Error (capital), a bug in your original
@@ -195,7 +197,7 @@ router.post('/login', async (req, res) => {
 });
 
 // GET /api/coaches
-router.get('/', async (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
   try {
     const coaches = await User.findAll({
       where: { role: 'coach' },
@@ -208,7 +210,7 @@ router.get('/', async (req, res) => {
 });
 
 // GET /api/coaches/:id
-router.get('/:id', async (req, res) => {
+router.get('/:id', requireAuth, async (req, res) => {
   try {
     const coach = await User.findByPk(req.params.id, {
       attributes: { exclude: ['password'] }
@@ -226,7 +228,7 @@ router.get('/:id', async (req, res) => {
 // PATCH /api/coaches/:id 
 // per-section inline eidt. Same proven shape as the sthlete route: 
 // scalars asign -if-provided, JSONB blobs shallow spread-merge. 
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', requireAuth, requireSelf, async (req, res) => {
   try { 
     // 1. Find the coach by primary key (UUID)
     const user = await User.findByPk(req.params.id);

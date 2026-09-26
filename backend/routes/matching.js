@@ -2,6 +2,7 @@ require('dotenv').config();
 
 const express = require('express');
 const router = express.Router();
+const { requireAuth } = require('../middleware/auth');
 const Anthropic = require('@anthropic-ai/sdk');
 const fs = require('fs/promises');
 const path = require('path');
@@ -11,7 +12,7 @@ const path = require('path');
 const client = new Anthropic();
 
 // POST /api/matching/find-athletes
-router.post('/find-athletes', async (req, res) => {
+router.post('/find-athletes', requireAuth, async (req, res) => {
   try {
     const { criteria } = req.body;
 

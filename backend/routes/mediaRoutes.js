@@ -9,6 +9,7 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const { execFileSync } = require("child_process");
+const { requireAuth, requireSelf } = require('../middleware/auth');
 
 // ─── Video upload storage (shared on-disk dir + naming) ───
 const VIDEO_DIR = path.join(__dirname, "..", "uploads", "videos");
@@ -90,7 +91,7 @@ function attachMediaRoutes(router, User, cfg) {
   const noun = labels.noun || "media";
 
   // POST /:id/<base>/upload — store the file, validate it, return its URL. No DB write.
-  router.post(`/:id/${base}/upload`, uploadSingleVideo, async (req, res) => {
+  router.post(`/:id/${base}/upload`, requireAuth, requireSelf, uploadSingleVideo, async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: 'No video file received (field name must be "video")' });
     }
@@ -116,7 +117,7 @@ function attachMediaRoutes(router, User, cfg) {
   });
 
   // POST /:id/<base> — append a clip object to onTheField[field].
-  router.post(`/:id/${base}`, async (req, res) => {
+  router.post(`/:id/${base}`, requireAuth, requireSelf, async (req, res) => {
     try {
       const user = await User.findByPk(req.params.id);
       if (!user || user.role !== role) {
@@ -158,7 +159,7 @@ function attachMediaRoutes(router, User, cfg) {
   });
 
   // DELETE /:id/<base> — remove a clip by url. Free for all tiers.
-  router.delete(`/:id/${base}`, async (req, res) => {
+  router.delete(`/:id/${base}`, requireAuth, requireSelf, async (req, res) => {
     try {
       const user = await User.findByPk(req.params.id);
       if (!user || user.role !== role) {
@@ -184,7 +185,7 @@ function attachMediaRoutes(router, User, cfg) {
   });
 
   // PATCH /:id/<base> — edit a clip's title by url. Free for all tiers.
-  router.patch(`/:id/${base}`, async (req, res) => {
+  router.patch(`/:id/${base}`, requireAuth, requireSelf, async (req, res) => {
     try {
       const user = await User.findByPk(req.params.id);
       if (!user || user.role !== role) {
