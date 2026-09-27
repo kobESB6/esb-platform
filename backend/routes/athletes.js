@@ -7,6 +7,7 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const User = require('../models/User');   // ← replaces fs/path/JSON helpers
 const { sanitizeUser } = require('../utils/sanitizeUser');
+const { deepMerge } = require('../utils/deepMerge');
 const { signToken, requireAuth, requireSelf } = require('../middleware/auth');
 const { attachMediaRoutes } = require('./mediaRoutes');
 // NOTE: readAthletes/writeAthletes helpers are GONE — the DB is our store now.
@@ -269,13 +270,13 @@ router.patch('/:id', requireAuth, requireSelf, async (req, res) => {
     //    onTheField.stats), this replaces that nested object wholesale.
     //    Revisit with a deep-merge here when the stats forms arrive.
     if (onTheField !== undefined) {
-      user.onTheField = { ...user.onTheField, ...onTheField };
+      user.onTheField = deepMerge(user.onTheField, onTheField);
     }
     if (inTheClassroom !== undefined) {
-      user.inTheClassroom = { ...user.inTheClassroom, ...inTheClassroom };
+      user.inTheClassroom = deepMerge(user.inTheClassroom, inTheClassroom);
     }
     if (offTheField !== undefined) {
-      user.offTheField = { ...user.offTheField, ...offTheField };
+      user.offTheField = deepMerge(user.offTheField, offTheField);
     }
     // 4. Persist. One UPDATE, only the attributes Sequelize saw change.
     await user.save();

@@ -6,6 +6,7 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const User = require('../models/User');   // ← replaces fs/path/JSON helpers
 const { sanitizeUser } = require('../utils/sanitizeUser');
+const { deepMerge } = require('../utils/deepMerge');
 const { signToken, requireAuth, requireSelf } = require('../middleware/auth');
 const { attachMediaRoutes } = require('./mediaRoutes');
 // Progression engine — role-specific starting rank
@@ -220,17 +221,17 @@ router.patch('/:id', requireAuth, requireSelf, async (req, res) => {
     // dirty-tracking) while keeping keys the client didn't send.
     // ⚠️ SHALLOW. `offTheField.occupation` is nested — send it whole.
     if (onTheField !== undefined) {
-      user.onTheField = { ...user.onTheField, ...onTheField };
+      user.onTheField = deepMerge(user.onTheField, onTheField);
     }
     if (inTheClassroom !== undefined) {
-      user.inTheClassroom = { ...user.inTheClassroom, ...inTheClassroom };
+      user.inTheClassroom = deepMerge(user.inTheClassroom, inTheClassroom);
     }
     if (offTheField !== undefined) {
-      user.offTheField = { ...user.offTheField, ...offTheField };
+      user.offTheField = deepMerge(user.offTheField, offTheField);
     }
     // mentorship — the legend↔athlete column (NOT recruiting, that's coach)
     if (mentorship !== undefined) {
-      user.mentorship = { ...user.mentorship, ...mentorship };
+      user.mentorship = deepMerge(user.mentorship, mentorship);
     }
 
     // 4. Persist. One UPDATE, only the changed attributes.
