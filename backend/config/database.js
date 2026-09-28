@@ -14,7 +14,7 @@ const sequelize = new Sequelize(
     host: process.env.DB_HOST,   // localhost
     port: process.env.DB_PORT,   // 5432
     dialect: 'postgres',         // tells Sequelize we're using Postgres (not MySQL, etc.)
-    logging: console.log,        // prints the SQL Sequelize generates — our teaching window
+    logging: process.env.NODE_ENV === 'production' ? false : console.log,  // SQL prints in dev, stays quiet in production
   }
 );
 

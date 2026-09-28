@@ -13,8 +13,9 @@ from legend.edit_profile import (
     edit_media_title,
 )
 
-API_URL = "http://localhost:3000/api"
-MEDIA_BASE = API_URL.replace("/api", "")   # backend origin that serves /uploads
+from utils.config import API_BASE
+API_URL = f"{API_BASE}/api"
+MEDIA_BASE = API_BASE   # backend origin that serves /uploads, from utils/config.py
 
 def show_legend_dashboard():
 

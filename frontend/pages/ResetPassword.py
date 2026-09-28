@@ -6,7 +6,8 @@
 import streamlit as st
 import requests
 
-API_URL = "http://localhost:3000"
+from utils.config import API_BASE
+API_URL = API_BASE   # backend address now comes from utils/config.py
 
 st.set_page_config(page_title="Reset Password - ESB", layout="centered")
 st.title("Reset Your Password")

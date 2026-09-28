@@ -14,8 +14,8 @@ from athlete.edit_profile import (
     edit_highlight_title,
 )
 
-MEDIA_BASE = "http://localhost:3000"   # backend origin that serves /uploads
-
+from utils.config import API_BASE
+MEDIA_BASE = API_BASE   # backend origin that serves /uploads, from utils/config.py
 def show_athlete_dashboard():
 
     # -- Access Control --------------------------------------------

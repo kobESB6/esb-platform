@@ -29,6 +29,7 @@ app.use('/api/legends', legendRoutes);
 app.use('/api/auth', authRoutes);
 
 // Start the server
-app.listen(3000, () => {
-  console.log("Server running on port 3000");
+const PORT = process.env.PORT || 3000;   // the host picks the port in production; 3000 on the Mac
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });

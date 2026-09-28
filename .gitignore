@@ -20,7 +20,7 @@ node_modules/
 .vscode/
 
 # Streamlit
-.streamlit/
+**/.streamlit/secrest.toml
 
 # Old project folder
 frontend/ESB 1st Project/

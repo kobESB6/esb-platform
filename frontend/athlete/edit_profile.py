@@ -18,8 +18,8 @@ def _authpost(*a, **k):   k.setdefault('headers', auth_headers()); return reques
 def _authpatch(*a, **k):  k.setdefault('headers', auth_headers()); return requests.patch(*a, **k)
 def _authdelete(*a, **k): k.setdefault('headers', auth_headers()); return requests.delete(*a, **k)
 
-API_URL = "http://localhost:3000"   # same base as utils/auth.py (no trailing /api)
-
+from utils.config import API_BASE
+API_URL = API_BASE   # backend address now comes from utils/config.py
 
 # -- Shared PATCH helper -------------------------------------------
 # Every section calls this with its own small payload. One place to own

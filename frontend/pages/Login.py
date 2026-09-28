@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 from utils.auth import authenticate
+from utils.config import API_BASE
 import time
 
 st.set_page_config(page_title="Login - ESB", layout="centered")
@@ -54,7 +55,7 @@ with st.expander("Forgot password?"):
     if st.button("Send reset link", key="send_reset"):
         try:
             r = requests.post(
-                "http://localhost:3000/api/auth/request-reset",
+                f"{API_BASE}/api/auth/request-reset",
                 json={"email": reset_email}
             )
             # Enumeration-safe: same message regardless of whether the email exists.

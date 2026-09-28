@@ -25,7 +25,7 @@ data/coaches.json
 node_modules/
 
 # Streamlit cache
-.streamlit/
+.streamlit/secrets.toml
 
 # Sensitive config
 secrets.toml
