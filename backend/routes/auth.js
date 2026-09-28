@@ -10,11 +10,12 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const User = require('../models/User');
+const { sendEmail } = require('../utils/mailer');
 
 const TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 const GENERIC_RESET_RESPONSE = {
-  message: 'If an account exists for that email, a reset link has been generated.'
+  message: 'If an account exists for that email, a reset link has been sent.'
 };
 
 // POST /api/auth/request-reset  { email }
@@ -36,13 +37,21 @@ router.post('/request-reset', async (req, res) => {
       user.resetTokenExpiry = expiry;
       await user.save();
 
+            const baseUrl = process.env.FRONTEND_URL || 'http://localhost:8501';
       const resetLink =
-        `http://localhost:8501/ResetPassword?email=${encodeURIComponent(cleanEmail)}&token=${rawToken}`;
-      console.log('\n================ PASSWORD RESET LINK ================');
-      console.log(`  For: ${cleanEmail}`);
-      console.log(`  ${resetLink}`);
-      console.log(`  (valid for 1 hour)`);
-      console.log('====================================================\n');
+        `${baseUrl}/ResetPassword?email=${encodeURIComponent(cleanEmail)}&token=${rawToken}`;
+
+      // Send without waiting, so the reply takes the same time
+      // whether or not the account exists (keeps it enumeration-safe).
+      sendEmail({
+        to: cleanEmail,
+        subject: 'Reset your ESB password',
+        text:
+          `Someone asked to reset the password for your ESB account.\n\n` +
+          `Click this link to pick a new password:\n${resetLink}\n\n` +
+          `This link works once and expires in 1 hour.\n` +
+          `If you didn't ask for this, you can ignore this email.`,
+      }).catch(err => console.error('reset email failed:', err.message));
     }
 
     return res.status(200).json(GENERIC_RESET_RESPONSE);
