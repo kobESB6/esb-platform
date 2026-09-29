@@ -12,6 +12,7 @@
 #   A form NEVER writes a searchable value into a blob — no new duplication.
 
 import streamlit as st
+from utils.sports import SPORTS
 import requests
 from utils.auth import auth_headers
 def _authpost(*a, **k):   k.setdefault('headers', auth_headers()); return requests.post(*a, **k)
@@ -59,10 +60,9 @@ def _athlete_id(user):
 # ==================================================================
 # ON THE FIELD  (searchable -> COLUMNS)
 #   primarySport / position / graduationYear -> columns
-#   addSport -> sportsPlayed array (append + de-dupe server-side)
-#   NOTE: height / weight / fortyTime are NOT yet promoted columns.
-#         TODO(sports-editor session): promote to columns via migration,
-#         then add those inputs here writing to the new columns.
+#   #   sportsPlayed -> full list replace; primary always included (built in the form)
+#   heightInches / weightLbs -> columns (already promoted)
+#   fortyTime -> moves to the per-sport football record (sport registry work)
 # ==================================================================
 def edit_on_the_field(user):
     athlete_id = _athlete_id(user)
@@ -81,14 +81,28 @@ def edit_on_the_field(user):
     with st.form("edit_onfield_form"):
         col1, col2 = st.columns(2)
         with col1:
-            new_primary = st.text_input("Primary sport", value=current_primary)
+                      # Open the dropdown on the athlete's current sport.
+            # Older accounts may hold a typed name that isn't on the list;
+            # those get a "— Select —" start so the athlete picks a real one.
+            if current_primary in SPORTS:
+                sport_options = SPORTS
+                sport_index   = SPORTS.index(current_primary)
+            else:
+                sport_options = ["— Select —"] + SPORTS
+                sport_index   = 0
+            new_primary = st.selectbox("Primary sport", sport_options, index=sport_index)
             new_grad    = st.number_input("Graduation year",
                                           value=int(current_grad) if current_grad else 2026,
                                           min_value=2024, max_value=2035, step=1)
         with col2:
             new_pos   = st.text_input("Position", value=current_pos)
-            add_sport = st.text_input("Add another sport (optional)", value="",
-                                      help="Adds one more sport beyond your primary")
+                        # One box handles adding AND removing other sports.
+            # The sportsPlayed column is the only source of truth (no blob fallback).
+            current_sports = user.get("sportsPlayed") or []
+            current_others = [s for s in current_sports if s != current_primary]
+            new_others = st.multiselect("Other sports you play", SPORTS,
+                                        default=[s for s in current_others if s in SPORTS],
+                                        help="Add or remove sports beyond your primary")
 
         st.markdown("**Measurables**")
         mcol1, mcol2, mcol3 = st.columns(3)
@@ -105,15 +119,19 @@ def edit_on_the_field(user):
 
     if saved:
         payload = {}
-        if new_primary != current_primary:
+        if new_primary != current_primary and new_primary != "— Select —":
             payload["primarySport"] = new_primary
         if new_pos != current_pos:
             payload["position"] = new_pos
         if current_grad is None or int(new_grad) != int(current_grad):
             payload["graduationYear"] = int(new_grad)
-        if add_sport.strip():
-            payload["addSport"] = add_sport.strip()
-
+                # Rebuild the full list: primary first, then the others, no repeats.
+        # Primary always stays in the list so coach sport searches find it.
+        final_primary = payload.get("primarySport", current_primary)
+        new_list = list(dict.fromkeys([final_primary] + new_others)) if final_primary else new_others
+        
+        if new_list != current_sports:
+            payload["sportsPlayed"] = new_list
         new_h_in = int(new_feet) * 12 + int(new_inch)
         if new_h_in != (current_h_in or 0):
             payload["heightInches"] = new_h_in if new_h_in > 0 else None

@@ -1,6 +1,7 @@
 import streamlit as st
 import time
 from utils.auth import create_user
+from utils.sports import SPORTS as SPORTS_LIST
 
 st.set_page_config(page_title="Join ESB", layout="centered")
 
@@ -8,6 +9,8 @@ st.set_page_config(page_title="Join ESB", layout="centered")
 # Athlete & legend pick their OWN primarySport; coach picks their OWN coaching sport.
 # No sport is ever assigned TO an athlete here — that ownership question belongs to
 # the future coach-creates-athlete/roster subsystem, which must let athletes override.
+SPORTS = ["— Select —"] + SPORTS_LIST
+
 SPORTS = ["— Select —", "Football", "Basketball", "Baseball", "Soccer",
           "Track & Field", "Volleyball", "Softball", "Wrestling", "Tennis",
           "Golf", "Swimming", "Cross Country", "Lacrosse", "Other"]
