@@ -36,3 +36,7 @@ backend/data/
 secrets.toml
 backend/data/
 backend/.env
+
+# Local backup copies and test media (never commit)
+*.bak*
+_test_media/
