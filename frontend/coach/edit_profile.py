@@ -174,7 +174,10 @@ POSITIONS_BY_SPORT = {
                       "Shot Put", "Discus", "Javelin", "Relays"],
 }
 
-SPORT_OPTIONS = list(POSITIONS_BY_SPORT.keys())   # single source — no drift
+# Wishlist sports come from the shared SPORTS list (same names athletes pick).
+# "Other" is left out — a coach can't recruit for an unnamed sport.
+# Sports without an entry in POSITIONS_BY_SPORT just show no positions yet.
+SPORT_OPTIONS = [s for s in SPORTS if s != "Other"]
 GRAD_YEAR_OPTIONS = [2026, 2027, 2028, 2029, 2030]
 
 
