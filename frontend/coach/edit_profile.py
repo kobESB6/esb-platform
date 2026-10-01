@@ -11,6 +11,7 @@
 #   A form NEVER writes a searchable value into a blob.
 
 import streamlit as st
+from utils.sports import SPORTS
 import requests
 from utils.auth import auth_headers
 def _authpost(*a, **k):   k.setdefault('headers', auth_headers()); return requests.post(*a, **k)
@@ -293,8 +294,16 @@ def edit_on_the_field(user):
         col1, col2 = st.columns(2)
         with col1:
             new_school = st.text_input("School", value=current_school)
-            new_sport  = st.text_input("Primary sport", value=current_sport)
-        with col2:
+                # Open the dropdown on the coach's current sport.
+            # Older accounts may hold a typed name that isn't on the list;
+            # those get a "— Select —" start so the coach picks a real one.
+            if current_sport in SPORTS:
+                sport_options = SPORTS
+                sport_index   = SPORTS.index(current_sport)
+            else:
+                sport_options = ["— Select —"] + SPORTS
+                sport_index   = 0
+            new_sport = st.selectbox("Sport you coach", sport_options, index=sport_index)        
             new_pos = st.text_input("Position", value=current_pos)
             # index guard: if a stored division isn't in our list, default to blank
             div_index = DIVISION_OPTIONS.index(current_div) if current_div in DIVISION_OPTIONS else 0
@@ -307,7 +316,7 @@ def edit_on_the_field(user):
         blob_changes = {}
 
         # --- COLUMNS (canonical) ---
-        if new_sport != current_sport:
+        if new_sport != current_sport and new_sport != "— Select —":
             payload["primarySport"] = new_sport
         if new_school != current_school:
             payload["school"] = new_school
