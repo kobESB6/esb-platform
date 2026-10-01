@@ -1,0 +1,404 @@
+// routes/legends.js — NOW POSTGRES-BACKED
+// Legend = former athlete, completed journey, giving back. No factory — one type.
+
+const express = require('express');
+const router = express.Router();
+const bcrypt = require('bcrypt');
+const User = require('../models/User');   // ← replaces fs/path/JSON helpers
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
+const { execFileSync } = require("child_process");
+
+// ─── Video upload storage config (media archive) ───
+// Mirrors athlete highlights: same on-disk dir + naming scheme.
+const VIDEO_DIR = path.join(__dirname, "..", "uploads", "videos");
+fs.mkdirSync(VIDEO_DIR, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, VIDEO_DIR),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
+  },
+});
+const upload = multer({ storage });
+
+// Read a video's duration in seconds via ffprobe. Number, or null if unreadable.
+function getVideoDuration(filePath) {
+  try {
+    const out = execFileSync("ffprobe", [
+      "-v", "error",
+      "-show_entries", "format=duration",
+      "-of", "default=noprint_wrappers=1:nokey=1",
+      filePath,
+    ]);
+    const seconds = parseFloat(out.toString().trim());
+    return Number.isFinite(seconds) ? seconds : null;
+  } catch (err) {
+    return null;
+  }
+}
+
+// Progression engine — role-specific starting rank
+function createProgression(role) {
+  const startingRank = { athlete: 'Rookie', coach: 'New Coach', legend: 'Alumni' };
+  return {
+    level: 1,
+    xp: 50,
+    rank: startingRank?.[role] ?? 'Rookie',   // ← fixed: now uses the lookup
+    badges: [{
+      name: 'First Step',
+      description: 'Welcome to ESB — your journey starts here',
+      earnedAt: new Date().toISOString()
+    }],
+    unlockedFeatures: ['basic_profile', 'browse_directory'],
+    milestones: [{ event: 'profile_created', xpAwarded: 50, timestamp: new Date().toISOString() }]
+  };
+}
+
+// ─── ROUTES ─────────────────────────────────────────────────────
+
+// POST /api/legends/register
+router.post('/register', async (req, res) => {
+  try {
+    const {
+      name, email, password, primarySport, sportsPlayed,
+      highestLevelPlayed, bio, occupation, mentorshipFocus
+    } = req.body;
+
+    if (!name || !email || !password || !primarySport) {
+      return res.status(400).json({
+        error: 'name, email, password, and primarySport are required'
+      });
+    }
+    const cleanEmail = email.trim().toLowerCase();
+    const existing = await User.findOne({ where: { email: cleanEmail } });
+    if (existing) {
+      return res.status(409).json({ error: 'Email already registered' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const sports = sportsPlayed || [primarySport];   // seed with primary if none given
+
+    const newLegend = await User.create({
+      name,
+      email: cleanEmail,
+      password: hashedPassword,
+      role: 'legend',
+      tier: 'basic',
+      isVerified: false,
+
+      // promoted columns
+      primarySport,
+      sportsPlayed: sports,
+
+      // JSONB — ON THE FIELD (legend's playing career)
+      onTheField: {
+        primarySport,
+        sportsPlayed: sports,
+        highestLevelPlayed: highestLevelPlayed || null,
+        careerHistory: [],
+        mediaArchive: []
+      },
+
+      // JSONB — IN THE CLASSROOM
+      inTheClassroom: {
+        highSchoolsAttended: [],
+        collegesAttended: [],
+        academicAchievements: []
+      },
+
+      // JSONB — OFF THE FIELD
+      offTheField: {
+        bio: bio || '',
+        occupation: occupation || {
+          current: '',
+          industry: '',
+          company: null,
+          yearsInField: '',
+          careerPath: '',
+          openToNetworking: true
+        },
+        mentorshipFocus: mentorshipFocus || [],
+        communityInvolvement: [],
+        socialLinks: { twitter: null, instagram: null, linkedin: null }
+      },
+
+      // JSONB — mentorship (legend↔athlete)
+      mentorship: {
+        isActiveMentor: true,
+        athletesMentored: [],
+        legendConnections: [],
+        maxMentees: 5,
+        mentorshipStyle: ''
+      },
+
+      linkedProfiles: [],
+      progression: createProgression('legend')
+    });
+
+    const { password: _, ...legendWithoutPassword } = newLegend.toJSON();
+    res.status(201).json({
+      message: 'Legend profile created successfully',
+      legend: legendWithoutPassword
+    });
+
+  } catch (error) {
+    console.error('Legend registration error:', error);
+    res.status(500).json({ error: 'Server error during registration' });
+  }
+});
+
+// POST /api/legends/login
+router.post('/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase(); 
+    const legend = await User.findOne({ where: { email: cleanEmail, role: 'legend' } });
+    if (!legend) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    const passwordMatch = await bcrypt.compare(password, legend.password);
+    if (!passwordMatch) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    const { password: _, ...legendWithoutPassword } = legend.toJSON();
+    res.status(200).json({ message: 'Login successful!', legend: legendWithoutPassword });
+
+  } catch (error) {
+    console.error('Legend login error:', error);
+    res.status(500).json({ error: 'Server error during login' });
+  }
+});
+
+// GET /api/legends
+router.get('/', async (req, res) => {
+  try {
+    const legends = await User.findAll({
+      where: { role: 'legend' },
+      attributes: { exclude: ['password'] }
+    });
+    res.json(legends);
+  } catch (error) {
+    res.status(500).json({ error: 'Could not retrieve legends' });
+  }
+});
+
+// GET /api/legends/:id
+router.get('/:id', async (req, res) => {
+  try {
+    const legend = await User.findByPk(req.params.id, {
+      attributes: { exclude: ['password'] }
+    });
+    if (!legend || legend.role !== 'legend') {
+      return res.status(404).json({ error: 'Legend not found' });
+    }
+    res.json(legend);
+  } catch (error) {
+    res.status(500).json({ error: 'Could not retrieve legend' });
+  }
+});
+
+// PATCH /api/legends/:id — partial update of a legend profile
+router.patch('/:id', async (req, res) => {
+  try {
+    // 1. Find the legend by primary key (the UUID in the URL).
+    const user = await User.findByPk(req.params.id);
+
+    // 2. Guard: must exist AND must actually be a legend row.
+    if (!user || user.role !== 'legend') {
+      return res.status(404).json({ error: 'Legend not found' });
+    }
+
+    // 3. Pull every updatable field. Anything not sent arrives as
+    //    `undefined` and gets skipped — that's what makes it a PATCH.
+    const {
+      // promoted scalar columns:
+      name, primarySport, position, school, graduationYear, profilePhoto,
+      // array column:
+      sportsPlayed, addSport,
+      // JSONB blobs:
+      onTheField, inTheClassroom, offTheField, mentorship,
+    } = req.body;
+
+    // ─── CATEGORY 1: scalar columns ───
+    // `!== undefined` not a truthy check, so a deliberate "" still saves.
+    // On a legend these mean *attended/played*, not currently enrolled.
+    if (name           !== undefined) user.name           = name;
+    if (primarySport   !== undefined) user.primarySport   = primarySport;
+    if (position       !== undefined) user.position       = position;
+    if (school         !== undefined) user.school         = school;
+    if (graduationYear !== undefined) user.graduationYear = graduationYear;
+    if (profilePhoto   !== undefined) user.profilePhoto   = profilePhoto;
+
+    // ─── CATEGORY 2: array column ───
+    // addSport appends one; sportsPlayed replaces the list.
+    // Both build a NEW array so Sequelize sees a changed reference.
+    if (addSport !== undefined) {
+      user.sportsPlayed = [...new Set([...user.sportsPlayed, addSport])];
+    } else if (sportsPlayed !== undefined) {
+      user.sportsPlayed = sportsPlayed;
+    }
+
+    // ─── CATEGORY 3: JSONB blobs — shallow spread-merge ───
+    // `{ ...old, ...incoming }` gives a new object reference (Sequelize
+    // dirty-tracking) while keeping keys the client didn't send.
+    // ⚠️ SHALLOW. `offTheField.occupation` is nested — send it whole.
+    if (onTheField !== undefined) {
+      user.onTheField = { ...user.onTheField, ...onTheField };
+    }
+    if (inTheClassroom !== undefined) {
+      user.inTheClassroom = { ...user.inTheClassroom, ...inTheClassroom };
+    }
+    if (offTheField !== undefined) {
+      user.offTheField = { ...user.offTheField, ...offTheField };
+    }
+    // mentorship — the legend↔athlete column (NOT recruiting, that's coach)
+    if (mentorship !== undefined) {
+      user.mentorship = { ...user.mentorship, ...mentorship };
+    }
+
+    // 4. Persist. One UPDATE, only the changed attributes.
+    await user.save();
+
+    // 5. Return the updated row, minus the password hash.
+    const { password: _omit, ...safeUser } = user.toJSON();
+    res.json(safeUser);
+  } catch (err) {
+    console.error('PATCH /api/legends/:id failed:', err);
+    res.status(500).json({ error: 'Failed to update legend' });
+  }
+});
+// ─── MEDIA ARCHIVE (legend highlights) ───────────────────────────
+// CRUD mirrors athlete highlights, but writes to onTheField.mediaArchive.
+// LEGENDS ARE UNLIMITED — no count cap and no duration cap (a finished
+//    career's legacy film runs long and deep). Uploads are still validated
+//    as real videos via ffprobe; only the tier gates are intentionally absent.
+
+// POST /api/legends/:id/media/upload
+// Piece 1: receive a video file, store it on disk, return its URL. No DB write.
+router.post('/:id/media/upload', upload.single('video'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No video file received (field name must be "video")' });
+  }
+
+  const duration = getVideoDuration(req.file.path);
+  if (duration === null) {
+    fs.unlinkSync(req.file.path);
+    return res.status(400).json({ error: 'That file is not a valid video.' });
+  }
+
+  // Legends are UNLIMITED — no duration cap (career legacy film runs long).
+  const url = `/uploads/videos/${req.file.filename}`;
+  res.json({ url, filename: req.file.filename, size: req.file.size, duration });
+});
+
+// POST /api/legends/:id/media
+// Piece 2: append a clip object to onTheField.mediaArchive.
+router.post('/:id/media', async (req, res) => {
+  try {
+    const user = await User.findByPk(req.params.id);
+    if (!user || user.role !== 'legend') {
+      return res.status(404).json({ error: 'Legend not found' });
+    }
+
+    const { title, url } = req.body;
+    if (!url) return res.status(400).json({ error: 'url is required' });
+
+    const clip = {
+      title: title || 'Untitled',
+      url,
+      type: 'video',
+      source: 'upload',
+      uploadedAt: new Date().toISOString(),
+    };
+
+    const existing = user.onTheField || {};
+    const currentMedia = existing.mediaArchive || [];
+
+    // Legends are UNLIMITED — no count cap on the media archive.
+    const mediaArchive = [...currentMedia, clip];
+    user.onTheField = { ...existing, mediaArchive };
+    await user.save();
+    const { password: _omit, ...safeUser } = user.toJSON();
+    res.json(safeUser);
+  } catch (err) {
+    console.error('POST /api/legends/:id/media failed:', err);
+    res.status(500).json({ error: 'Failed to add media' });
+  }
+});
+
+// DELETE /api/legends/:id/media — remove a clip by url. Free for all tiers.
+router.delete('/:id/media', async (req, res) => {
+  try {
+    const user = await User.findByPk(req.params.id);
+    if (!user || user.role !== 'legend') {
+      return res.status(404).json({ error: 'Legend not found' });
+    }
+
+    const { url } = req.body;
+    if (!url) return res.status(400).json({ error: 'url is required to identify the clip' });
+
+    const existing = user.onTheField || {};
+    const currentMedia = existing.mediaArchive || [];
+
+    const mediaArchive = currentMedia.filter((clip) => clip.url !== url);
+    if (mediaArchive.length === currentMedia.length) {
+      return res.status(404).json({ error: 'No media found with that url' });
+    }
+
+    user.onTheField = { ...existing, mediaArchive };
+    await user.save();
+    const { password: _omit, ...safeUser } = user.toJSON();
+    res.json(safeUser);
+  } catch (err) {
+    console.error('DELETE /api/legends/:id/media failed:', err);
+    res.status(500).json({ error: 'Failed to delete media' });
+  }
+});
+
+// PATCH /api/legends/:id/media — edit a clip's title by url. Free for all tiers.
+router.patch('/:id/media', async (req, res) => {
+  try {
+    const user = await User.findByPk(req.params.id);
+    if (!user || user.role !== 'legend') {
+      return res.status(404).json({ error: 'Legend not found' });
+    }
+
+    const { url, title } = req.body;
+    if (!url) return res.status(400).json({ error: 'url is required to identify the clip' });
+    if (title === undefined) return res.status(400).json({ error: 'title is required' });
+
+    const existing = user.onTheField || {};
+    const currentMedia = existing.mediaArchive || [];
+
+    let found = false;
+    const mediaArchive = currentMedia.map((clip) => {
+      if (clip.url === url) {
+        found = true;
+        return { ...clip, title: title || 'Untitled' };
+      }
+      return clip;
+    });
+    if (!found) {
+      return res.status(404).json({ error: 'No media found with that url' });
+    }
+
+    user.onTheField = { ...existing, mediaArchive };
+    await user.save();
+    const { password: _omit, ...safeUser } = user.toJSON();
+    res.json(safeUser);
+  } catch (err) {
+    console.error('PATCH /api/legends/:id/media failed:', err);
+    res.status(500).json({ error: 'Failed to edit media' });
+  }
+});
+
+module.exports = router;

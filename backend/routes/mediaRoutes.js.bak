@@ -1,0 +1,193 @@
+// routes/mediaRoutes.js
+// Shared video-clip CRUD for BOTH athlete highlights and legend media archive.
+// Each role stores an array of clip objects inside its `onTheField` JSONB blob;
+// this factory registers the 4 routes (upload / attach / delete / edit-title)
+// on a given router, parametrized per role. Extracted from the once-duplicated
+// blocks in athletes.js and legends.js — change clip behavior in ONE place now.
+
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
+const { execFileSync } = require("child_process");
+
+// ─── Video upload storage (shared on-disk dir + naming) ───
+const VIDEO_DIR = path.join(__dirname, "..", "uploads", "videos");
+fs.mkdirSync(VIDEO_DIR, { recursive: true });   // self-heals on fresh clone
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, VIDEO_DIR),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);   // preserve .mp4 / .mov
+    cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
+  },
+});
+const upload = multer({ storage });
+
+// Read a video's duration in seconds via ffprobe. Number, or null if unreadable.
+function getVideoDuration(filePath) {
+  try {
+    const out = execFileSync("ffprobe", [
+      "-v", "error",
+      "-show_entries", "format=duration",
+      "-of", "default=noprint_wrappers=1:nokey=1",
+      filePath,
+    ]);
+    const seconds = parseFloat(out.toString().trim());
+    return Number.isFinite(seconds) ? seconds : null;
+  } catch (err) {
+    return null;
+  }
+}
+
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/**
+ * Register the 4 clip routes on `router`, scoped to one role.
+ * cfg = {
+ *   role,            // 'athlete' | 'legend'  (row guard)
+ *   field,           // onTheField key: 'highlights' | 'mediaArchive'
+ *   base,            // url segment: 'highlights' | 'media'
+ *   countLimits,     // { basic, premium } or null = UNLIMITED
+ *   durationLimits,  // { basic, premium } (seconds) or null = no cap
+ *   clipExtra,       // extra fields merged into every clip, e.g. { type:'video' }
+ *   labels,          // { durationUnit, countLabel, noun } for user-facing text
+ * }
+ */
+function attachMediaRoutes(router, User, cfg) {
+  const {
+    role, field, base,
+    countLimits = null,
+    durationLimits = null,
+    clipExtra = {},
+    labels = {},
+  } = cfg;
+  const durationUnit = labels.durationUnit || "clips";
+  const countLabel = labels.countLabel || "Media";
+  const noun = labels.noun || "media";
+
+  // POST /:id/<base>/upload — store the file, validate it, return its URL. No DB write.
+  router.post(`/:id/${base}/upload`, upload.single("video"), async (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No video file received (field name must be "video")' });
+    }
+    const duration = getVideoDuration(req.file.path);
+    if (duration === null) {
+      fs.unlinkSync(req.file.path);   // clean up the bad file — no orphan
+      return res.status(400).json({ error: "That file is not a valid video." });
+    }
+    if (durationLimits) {
+      const user = await User.findByPk(req.params.id);
+      const tier = user?.tier || "basic";
+      const limit = durationLimits[tier] ?? durationLimits.basic;
+      if (duration > limit) {
+        fs.unlinkSync(req.file.path);
+        return res.status(403).json({
+          error: `Basic ${durationUnit} are up to ${limit}s. Upgrade to premium to post longer film.`,
+          tier, limit, duration,
+        });
+      }
+    }
+    const url = `/uploads/videos/${req.file.filename}`;
+    res.json({ url, filename: req.file.filename, size: req.file.size, duration });
+  });
+
+  // POST /:id/<base> — append a clip object to onTheField[field].
+  router.post(`/:id/${base}`, async (req, res) => {
+    try {
+      const user = await User.findByPk(req.params.id);
+      if (!user || user.role !== role) {
+        return res.status(404).json({ error: `${cap(role)} not found` });
+      }
+      const { title, url } = req.body;
+      if (!url) return res.status(400).json({ error: "url is required" });
+
+      const clip = {
+        title: title || "Untitled",
+        url,
+        source: "upload",
+        uploadedAt: new Date().toISOString(),
+        ...clipExtra,
+      };
+
+      const existing = user.onTheField || {};
+      const current = existing[field] || [];
+
+      if (countLimits) {
+        const limit = countLimits[user.tier] ?? countLimits.basic;
+        if (current.length >= limit) {
+          return res.status(403).json({
+            error: `${countLabel} limit reached for ${user.tier} tier (max ${limit}). Upgrade to add more.`,
+            tier: user.tier, limit, current: current.length,
+          });
+        }
+      }
+
+      const updated = [...current, clip];
+      user.onTheField = { ...existing, [field]: updated };
+      await user.save();
+      const { password: _omit, ...safeUser } = user.toJSON();
+      res.json(safeUser);
+    } catch (err) {
+      console.error(`POST /:id/${base} failed:`, err);
+      res.status(500).json({ error: `Failed to add ${noun}` });
+    }
+  });
+
+  // DELETE /:id/<base> — remove a clip by url. Free for all tiers.
+  router.delete(`/:id/${base}`, async (req, res) => {
+    try {
+      const user = await User.findByPk(req.params.id);
+      if (!user || user.role !== role) {
+        return res.status(404).json({ error: `${cap(role)} not found` });
+      }
+      const { url } = req.body;
+      if (!url) return res.status(400).json({ error: "url is required to identify the clip" });
+
+      const existing = user.onTheField || {};
+      const current = existing[field] || [];
+      const updated = current.filter((clip) => clip.url !== url);
+      if (updated.length === current.length) {
+        return res.status(404).json({ error: `No ${noun} found with that url` });
+      }
+      user.onTheField = { ...existing, [field]: updated };
+      await user.save();
+      const { password: _omit, ...safeUser } = user.toJSON();
+      res.json(safeUser);
+    } catch (err) {
+      console.error(`DELETE /:id/${base} failed:`, err);
+      res.status(500).json({ error: `Failed to delete ${noun}` });
+    }
+  });
+
+  // PATCH /:id/<base> — edit a clip's title by url. Free for all tiers.
+  router.patch(`/:id/${base}`, async (req, res) => {
+    try {
+      const user = await User.findByPk(req.params.id);
+      if (!user || user.role !== role) {
+        return res.status(404).json({ error: `${cap(role)} not found` });
+      }
+      const { url, title } = req.body;
+      if (!url) return res.status(400).json({ error: "url is required to identify the clip" });
+      if (title === undefined) return res.status(400).json({ error: "title is required" });
+
+      const existing = user.onTheField || {};
+      const current = existing[field] || [];
+      let found = false;
+      const updated = current.map((clip) => {
+        if (clip.url === url) { found = true; return { ...clip, title: title || "Untitled" }; }
+        return clip;
+      });
+      if (!found) return res.status(404).json({ error: `No ${noun} found with that url` });
+
+      user.onTheField = { ...existing, [field]: updated };
+      await user.save();
+      const { password: _omit, ...safeUser } = user.toJSON();
+      res.json(safeUser);
+    } catch (err) {
+      console.error(`PATCH /:id/${base} failed:`, err);
+      res.status(500).json({ error: `Failed to edit ${noun}` });
+    }
+  });
+}
+
+module.exports = { attachMediaRoutes, VIDEO_DIR, getVideoDuration, upload };

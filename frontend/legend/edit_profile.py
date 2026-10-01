@@ -14,6 +14,7 @@
 #     always send the WHOLE occupation object (same workaround as socialLinks).
 
 import streamlit as st
+from utils.sports import SPORTS
 import requests
 from utils.auth import auth_headers
 def _authpost(*a, **k):   k.setdefault('headers', auth_headers()); return requests.post(*a, **k)
@@ -60,7 +61,7 @@ def _legend_id(user):
 # ON THE FIELD  (the legend's playing career)
 #   primarySport / position / school / graduationYear -> COLUMNS
 #   highestLevelPlayed -> onTheField blob (narrative)
-#   addSport -> sportsPlayed array (append + de-dupe server-side)
+#   sportsPlayed -> full list replace; primary always included (built in the form)
 # ==================================================================
 def edit_on_the_field(user):
     legend_id = _legend_id(user)
@@ -77,7 +78,16 @@ def edit_on_the_field(user):
     with st.form("edit_legend_onfield_form"):
         col1, col2 = st.columns(2)
         with col1:
-            new_primary = st.text_input("Primary sport", value=current_primary)
+                    # Open the dropdown on the legend's current sport.
+            # Older accounts may hold a typed name that isn't on the list;
+            # those get a "— Select —" start so the legend picks a real one.
+            if current_primary in SPORTS:
+                sport_options = SPORTS
+                sport_index   = SPORTS.index(current_primary)
+            else:
+                sport_options = ["— Select —"] + SPORTS
+                sport_index   = 0
+            new_primary = st.selectbox("Primary sport", sport_options, index=sport_index)
             new_pos     = st.text_input("Position played", value=current_pos)
             new_school  = st.text_input("School attended", value=current_school)
         with col2:
@@ -87,13 +97,18 @@ def edit_on_the_field(user):
             new_grad  = st.number_input("Graduation year",
                                         value=int(current_grad) if current_grad else 2010,
                                         min_value=1950, max_value=2035, step=1)
-            add_sport = st.text_input("Add another sport (optional)", value="",
-                                      help="Adds one more sport beyond your primary")
+                        # One box handles adding AND removing other sports.
+            # The sportsPlayed column is the only source of truth (no blob fallback).
+            current_sports = user.get("sportsPlayed") or []
+            current_others = [s for s in current_sports if s != current_primary]
+            new_others = st.multiselect("Other sports you played", SPORTS,
+                                        default=[s for s in current_others if s in SPORTS],
+                                        help="Add or remove sports beyond your primary")
         saved = st.form_submit_button("Save On The Field")
 
     if saved:
         payload = {}
-        if new_primary != current_primary:
+        if new_primary != current_primary and new_primary != "— Select —":
             payload["primarySport"] = new_primary
         if new_pos != current_pos:
             payload["position"] = new_pos
@@ -103,8 +118,12 @@ def edit_on_the_field(user):
             payload["graduationYear"] = int(new_grad)
         if new_level != current_level:
             payload["onTheField"] = {"highestLevelPlayed": new_level}
-        if add_sport.strip():
-            payload["addSport"] = add_sport.strip()
+                # Rebuild the full list: primary first, then the others, no repeats.
+        # Primary always stays in the list so sport searches find it.
+        final_primary = payload.get("primarySport", current_primary)
+        new_list = list(dict.fromkeys([final_primary] + new_others)) if final_primary else new_others
+        if new_list != current_sports:
+            payload["sportsPlayed"] = new_list
         _patch(legend_id, payload, user)
 
 
