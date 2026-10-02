@@ -63,9 +63,7 @@ router.post('/register', async (req, res) => {
       sportsPlayed: sports,
 
       // JSONB — ON THE FIELD (legend's playing career)
-      onTheField: {
-        primarySport,
-        sportsPlayed: sports,
+            onTheField: {
         highestLevelPlayed: highestLevelPlayed || null,
         careerHistory: [],
         mediaArchive: []

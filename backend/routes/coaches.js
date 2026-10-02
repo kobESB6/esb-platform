@@ -109,6 +109,10 @@ function createCoach(data, hashedPassword) {
 
 // Maps the OOP object's UPPERCASE IDMM keys → the model's JSONB columns
 function toUserRecord(coachObj) {
+  // Split sport off the blob: it lives in the primarySport column ONLY.
+  // `...onTheFieldRest` = everything in ON_THE_FIELD except sport.
+  const { sport, ...onTheFieldRest } = coachObj.ON_THE_FIELD;
+
   return {
     name: coachObj.name,
     email: coachObj.email,
@@ -117,9 +121,9 @@ function toUserRecord(coachObj) {
     tier: coachObj.tier,
     isVerified: coachObj.isVerified,
     coachType: coachObj.coachType,
-    primarySport: coachObj.ON_THE_FIELD.sport,   // promote sport → column
+    primarySport: sport,                          // sport → column only
     school: coachObj.ON_THE_FIELD.school,         // promote school → column
-    onTheField: coachObj.ON_THE_FIELD,
+    onTheField: onTheFieldRest,                   // blob without sport
     inTheClassroom: coachObj.IN_THE_CLASSROOM,
     offTheField: coachObj.OFF_THE_FIELD,
     recruiting: coachObj.recruiting || {},        // only college coaches have this

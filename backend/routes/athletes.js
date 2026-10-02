@@ -82,8 +82,7 @@ router.post('/register', async (req, res) => {
 
       // JSONB — ON THE FIELD
       onTheField: {
-        primarySport,
-        sportsPlayed: [primarySport],
+        
         position,
         height: height || null,
         weight: weight || null,
