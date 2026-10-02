@@ -1,6 +1,6 @@
 import streamlit as st
 import time
-from utils.auth import create_user
+from utils.auth import create_user, authenticate
 from utils.sports import SPORTS as SPORTS_LIST
 
 st.set_page_config(page_title="Join ESB", layout="centered")
@@ -100,19 +100,20 @@ if st.button("Sign Up", key="signup_button"):
     elif any(isinstance(v, str) and not v.strip() for v in extra.values()):
         st.warning("Please fill in all fields for your role.")
     else:
-        success = create_user(username, password, name, role.lower(), extra)
-        if success:
-            st.session_state.user = {
-                "name": name,
-                "role": role.lower(),
-            }
+                     created = create_user(username, password, name, role.lower(), extra)
+    if created:
+            # Log the new account in exactly like Login.py does,
+            # so the session gets the user AND the token that edits need.
+            user, token = authenticate(username, password)
+            st.session_state.user = user
+            st.session_state.token = token
             st.session_state.logged_in = True
             st.session_state.role = role.lower()
             st.success(f"Welcome to ESB, {name}!")
             with st.spinner("Redirecting..."):
                 time.sleep(1.5)
             st.switch_page("pages/RoleRouter.py")  # ✅ Use central router
-        else:
+    else:
             st.error("An account with this username already exists.")
 
 st.markdown('</div>', unsafe_allow_html=True)

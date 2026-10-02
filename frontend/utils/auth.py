@@ -57,11 +57,14 @@ def create_user(username, password, name, role, extra):
 
     try:
         response = requests.post(url, json=payload)
-        return response.status_code == 201
+        if response.status_code == 201:
+            # Server wraps the new user under the role name: {"coach": {...}}
+            data = response.json()
+            return data.get(role) or data
+        return None
     except Exception as e:
         print(f"Registration error: {e}")
-        return False
-
+        return None
 
 def auth_headers():
     token = st.session_state.get('token', '')
