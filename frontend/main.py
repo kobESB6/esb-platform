@@ -60,7 +60,8 @@ st.markdown('<div class="tagline">Providing Knowledge • Cultivating Passion �
 st.markdown("---")
 
 # -- Button Navigation --
-st.markdown('<div class="btn-container">', unsafe_allow_html=True)
+# (No wrapper div: Streamlit can't put buttons inside raw HTML,
+#  so the old open/close divs only drew an empty box.)
 
 # 📌 Single block: Side-by-side buttons only
 col1, col2, col3 = st.columns([1, 0.5, 1])  # Adds spacing between buttons
@@ -69,6 +70,4 @@ with col1:
         st.switch_page("pages/Login.py")
 with col3:
     if st.button("Get Started"):
-        st.switch_page("pages/Signup.py")
-
-st.markdown('</div>', unsafe_allow_html=True)
+               st.switch_page("pages/Signup.py")
