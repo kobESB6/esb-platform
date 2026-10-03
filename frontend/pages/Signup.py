@@ -65,7 +65,9 @@ st.markdown("""
 st.markdown('<div class="form-container">', unsafe_allow_html=True)
 st.markdown('<div class="form-title">Create Your ESB Account</div>', unsafe_allow_html=True)
 
-name = st.text_input("Full Name")
+# .strip() removes spaces at the start and end, so "  Big C  " saves as "Big C".
+# A name that's only spaces becomes "", which the empty check below catches.
+name = st.text_input("Full Name").strip()
 username = st.text_input("Email or Username")
 role = st.selectbox("Choose a Role", ["Athlete", "Coach", "Legend"])
 password = st.text_input("Password", type="password")
