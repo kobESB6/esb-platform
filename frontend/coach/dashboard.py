@@ -26,7 +26,9 @@ def show_coach_dashboard():
     st.markdown(f"**School:** {st.session_state.user.get('school') or of.get('school') or '—'}")
     st.markdown(f"**Sport:** {st.session_state.user.get('primarySport') or of.get('sport') or '—'}")
     st.markdown(f"**Position:** {of.get('position') or '—'}")
-    st.markdown(f"**Division:** {of.get('division') or '—'}")
+        # Division is college-only, so only college coaches see this line.
+    if st.session_state.user.get("coachType") == "college":
+        st.markdown(f"**Division:** {of.get('division') or '—'}")
     with st.expander("✏️ Edit On The Field"):
         edit_on_the_field(st.session_state.user)   
     

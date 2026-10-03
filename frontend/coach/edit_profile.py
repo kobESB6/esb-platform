@@ -308,10 +308,16 @@ def edit_on_the_field(user):
                 sport_index   = 0
             new_sport = st.selectbox("Sport you coach", sport_options, index=sport_index)        
             new_pos = st.text_input("Position", value=current_pos)
-            # index guard: if a stored division isn't in our list, default to blank
-            div_index = DIVISION_OPTIONS.index(current_div) if current_div in DIVISION_OPTIONS else 0
-            new_div = st.selectbox("Division", options=DIVISION_OPTIONS, index=div_index,
-                                   help="Your program's level. Blank = not set.")
+                        # Division is college-only. High school coaches never see it.
+            # For them, new_div equals the old value, so the save step
+            # sees "no change" and leaves the blob alone.
+            if user.get("coachType") == "college":
+                # index guard: if a stored division isn't in our list, default to blank
+                div_index = DIVISION_OPTIONS.index(current_div) if current_div in DIVISION_OPTIONS else 0
+                new_div = st.selectbox("Division", options=DIVISION_OPTIONS, index=div_index,
+                                       help="Your program's level. Blank = not set.")
+            else:
+                new_div = current_div
         saved = st.form_submit_button("Save On The Field")
 
     if saved:
