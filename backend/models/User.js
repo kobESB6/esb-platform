@@ -34,8 +34,14 @@ const User = sequelize.define('User', {
   gpa:            { type: DataTypes.DECIMAL(3, 2), allowNull: true },
   heightInches:   { type: DataTypes.INTEGER, allowNull: true },   // total inches (5'7" = 67) — sortable/searchable
   weightLbs:      { type: DataTypes.INTEGER, allowNull: true },   // pounds — sortable/searchable
-    coachType:      { type: DataTypes.STRING, allowNull: true },   // ← add here: 'highschool' | 'college', null for non-coaches
- 
+        coachType:      { type: DataTypes.STRING, allowNull: true },   // ← add here: 'highschool' | 'college', null for non-coaches
+  recruitingStatus: {
+    type: DataTypes.STRING,
+    allowNull: true,   // null for coaches and legends
+    validate: {        // only these five values can be saved
+      isIn: [['Uncommitted', 'Receiving Interest', 'Offered', 'Verbally Committed', 'Signed']],
+    },
+  },
 
   // ─── IDMM BODIES (JSONB — the flexible, evolving profile) ───
   onTheField:     { type: DataTypes.JSONB, defaultValue: {} },
@@ -61,7 +67,8 @@ const User = sequelize.define('User', {
     { fields: ['sportsPlayed'], using: 'gin' },   // ← multi-sport search
     { fields: ['coachType'] },   // fast "get all college coaches"
     { fields: ['heightInches'] },   // recruiting: filter by height
-    { fields: ['weightLbs'] },      // recruiting: filter by weight
+        { fields: ['weightLbs'] },      // recruiting: filter by weight
+    { fields: ['recruitingStatus'] }, // recruiting: filter by commitment
   ],
 });
 

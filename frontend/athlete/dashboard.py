@@ -67,7 +67,7 @@ def show_athlete_dashboard():
     height = f"{_h_in // 12}'{_h_in % 12}\"" if _h_in else "Not set"
     _w_lbs = user.get("weightLbs")
     weight = f"{_w_lbs} lbs" if _w_lbs else "Not set"
-    recruiting_status = on_field.get("recruitingStatus", "Not set")
+    recruiting_status = user.get("recruitingStatus") or "Not set"   # column only; blob copy retired Oct 3
 
     col1, col2 = st.columns(2)
     with col1:

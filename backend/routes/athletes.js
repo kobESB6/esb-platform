@@ -79,6 +79,7 @@ router.post('/register', async (req, res) => {
       school,
       graduationYear,
       gpa: gpa || null,
+      recruitingStatus: 'Uncommitted',   // every new athlete starts here (column = only truth)
 
       // JSONB — ON THE FIELD
       onTheField: {
@@ -88,7 +89,6 @@ router.post('/register', async (req, res) => {
         weight: weight || null,
         school,
         graduationYear,
-        recruitingStatus: 'Uncommitted',
         athleteType: null,
         stats: [],
         awards: [],
@@ -229,8 +229,9 @@ router.patch('/:id', requireAuth, requireSelf, async (req, res) => {
     const {
       // promoted scalar columns:
       name, primarySport, position, school, graduationYear, gpa, profilePhoto,
-      heightInches, weightLbs,
+      heightInches, weightLbs, recruitingStatus,
       // array column:
+  
       sportsPlayed, addSport,
       // JSONB blobs:
       onTheField, inTheClassroom, offTheField,
@@ -247,6 +248,7 @@ router.patch('/:id', requireAuth, requireSelf, async (req, res) => {
     if (profilePhoto   !== undefined) user.profilePhoto   = profilePhoto;
     if (heightInches   !== undefined) user.heightInches   = heightInches;
     if (weightLbs      !== undefined) user.weightLbs      = weightLbs;
+    if (recruitingStatus !== undefined) user.recruitingStatus = recruitingStatus;
 
     // ─── CATEGORY 2: array column (sportsPlayed) ───
     // Two ways to touch it:
@@ -284,7 +286,12 @@ router.patch('/:id', requireAuth, requireSelf, async (req, res) => {
     const { password: _omit, ...safeUser } = user.toJSON();
     res.json(safeUser);
 
-  } catch (err) {
+    } catch (err) {
+    // Bad value (like a status not on the allowed list) → 400 "your request was wrong",
+    // not 500 "the server broke".
+    if (err.name === 'SequelizeValidationError') {
+      return res.status(400).json({ error: err.errors.map(e => e.message).join('; ') });
+    }
     console.error('PATCH /api/athletes/:id failed:', err);
     res.status(500).json({ error: 'Failed to update athlete' });
   }
