@@ -11,6 +11,8 @@ const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const User = require('../models/User');
 const { sendEmail } = require('../utils/mailer');
+const { requireAuth } = require('../middleware/auth');
+const { sanitizeUser } = require('../utils/sanitizeUser');
 
 const TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 
@@ -100,6 +102,24 @@ router.post('/reset-password', async (req, res) => {
   } catch (error) {
     console.error('reset-password error:', error);
     return res.status(500).json({ error: 'Server error during password reset' });
+  }
+});
+
+// GET /api/auth/me — "who am I?"
+// The frontend sends the token it saved in a cookie. requireAuth checks it.
+// If the token is good, we look the user up fresh and send them back, so a
+// page refresh can rebuild the session. Any problem returns 401, which tells
+// the frontend to delete the cookie and show the login page.
+router.get('/me', requireAuth, async (req, res) => {
+  try {
+    const user = await User.findByPk(req.auth.userId);
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid or expired session' });
+    }
+    return res.status(200).json({ user: sanitizeUser(user) });
+  } catch (error) {
+    console.error('me error:', error);
+    return res.status(500).json({ error: 'Server error' });
   }
 });
 

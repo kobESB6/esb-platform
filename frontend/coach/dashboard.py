@@ -1,5 +1,6 @@
 import streamlit as st
 from utils.sidebar import hide_default_nav
+from utils.auth import logout
 from coach.edit_profile import edit_off_the_field, edit_contact, edit_wishlist, edit_on_the_field
 
 def show_coach_dashboard():
@@ -78,5 +79,4 @@ def show_coach_dashboard():
     st.info("Messaging feature coming soon!")
     # Log Out — relocated from the removed sidebar
     if st.button("Log Out"):
-        st.session_state.clear()
-        st.switch_page("main.py")
+        logout()

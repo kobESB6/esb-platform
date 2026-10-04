@@ -1,11 +1,16 @@
 # utils/auth.py
 # Authentication utility — tries all three user type endpoints
 # Returns the matched user with their correct role attached
+import json
 import requests
 import streamlit as st
+import streamlit.components.v1 as components
 
 from utils.config import API_BASE
 API_URL = API_BASE   # backend address now comes from utils/config.py
+
+COOKIE_NAME = "esb_token"
+COOKIE_MAX_AGE = 7 * 24 * 60 * 60   # 7 days, same as the backend token's expiresIn '7d'
 
 
 def authenticate(email, password):
@@ -69,3 +74,70 @@ def create_user(username, password, name, role, extra):
 def auth_headers():
     token = st.session_state.get('token', '')
     return {'Authorization': f'Bearer {token}'} if token else {}
+
+
+# ── Stay-logged-in cookie ─────────────────────────────────────────
+
+def _write_cookie(value, max_age=None):
+    # Streamlit can't write cookies, so we render an invisible HTML block.
+    # Its JavaScript sets the cookie on the main page (parent.document),
+    # because the block itself runs inside a small iframe.
+    # No max_age = cookie lasts until the browser closes. max_age=0 = delete it.
+    cookie = f"{COOKIE_NAME}={value}; path=/; SameSite=Strict"
+    if max_age is not None:
+        cookie += f"; max-age={max_age}"
+    components.html(f"<script>parent.document.cookie = {json.dumps(cookie)};</script>", height=0)
+
+
+def save_session_cookie():
+    # Called by RoleRouter. Writes the cookie once per session.
+    # "Remember me" checked = 7 days. Unchecked = until the browser closes.
+    if st.session_state.get("logged_in") and not st.session_state.get("cookie_saved"):
+        max_age = COOKIE_MAX_AGE if st.session_state.get("remember") else None
+        _write_cookie(st.session_state.token, max_age)
+        st.session_state.cookie_saved = True
+
+
+def restore_session():
+    # Called by RoleRouter before the Access Denied check.
+    # After a refresh, session_state is empty but the browser still sends
+    # the cookie. We ask the backend who that token belongs to and refill
+    # the session. Returns True if the user is logged in.
+    if st.session_state.get("logged_in"):
+        return True
+    if st.session_state.get("logged_out"):
+        return False   # just logged out, so ignore the old cookie
+    token = st.context.cookies.get(COOKIE_NAME)
+    if not token:
+        return False
+    try:
+        r = requests.get(f"{API_URL}/api/auth/me",
+                         headers={"Authorization": f"Bearer {token}"}, timeout=5)
+    except Exception as e:
+        # Backend unreachable: keep the cookie. A server hiccup shouldn't log you out.
+        print(f"Restore error: {e}")
+        return False
+    if r.status_code != 200:
+        _write_cookie("", 0)   # bad or expired token, so delete it
+        return False
+    user = r.json()["user"]
+    st.session_state.user = user
+    st.session_state.role = user["role"]
+    st.session_state.token = token
+    st.session_state.logged_in = True
+    st.session_state.cookie_saved = True   # already in the browser, don't rewrite it
+    return True
+
+
+def logout():
+    # One shared Log Out for all three dashboards.
+    st.session_state.clear()
+    st.session_state.logged_out = True     # blocks restore_session from reusing the old cookie
+    st.session_state.clear_cookie = True   # tells main.py to delete the cookie
+    st.switch_page("main.py")
+
+
+def finish_logout():
+    # Called at the top of main.py. Deletes the cookie right after a logout.
+    if st.session_state.pop("clear_cookie", False):
+        _write_cookie("", 0)

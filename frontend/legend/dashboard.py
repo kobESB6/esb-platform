@@ -14,6 +14,7 @@ from legend.edit_profile import (
 )
 
 from utils.config import API_BASE
+from utils.auth import logout
 API_URL = f"{API_BASE}/api"
 MEDIA_BASE = API_BASE   # backend origin that serves /uploads, from utils/config.py
 
@@ -234,5 +235,4 @@ def show_legend_dashboard():
 
     # ── LOGOUT ────────────────────────────────────────────────────
     if st.button("Log Out"):
-        st.session_state.clear()
-        st.switch_page("main.py")
+        logout()

@@ -3,10 +3,13 @@ import os
 import json
 
 from utils.sidebar import hide_default_nav
+from utils.auth import finish_logout
 hide_default_nav()
 
 st.set_page_config(page_title="Eat Sleep Breathe Sports", layout="centered")
 
+# Just logged out? Delete the stay-logged-in cookie.
+finish_logout()
 # -- Load users from file --
 USER_DB = "profiles.json"
 

@@ -15,6 +15,7 @@ from athlete.edit_profile import (
 )
 
 from utils.config import API_BASE
+from utils.auth import logout
 MEDIA_BASE = API_BASE   # backend origin that serves /uploads, from utils/config.py
 def show_athlete_dashboard():
 
@@ -225,5 +226,4 @@ def show_athlete_dashboard():
 
     # -- LOGOUT ----------------------------------------------------
     if st.button("Log Out"):
-        st.session_state.clear()
-        st.switch_page("main.py")
+        logout()
