@@ -64,6 +64,10 @@ def _athlete_id(user):
 #   heightInches / weightLbs -> columns (already promoted)
 #   fortyTime -> moves to the per-sport football record (sport registry work)
 # ==================================================================
+# Must match the isIn list in backend/models/User.js
+RECRUITING_STATUSES = ["Uncommitted", "Receiving Interest", "Offered",
+                       "Verbally Committed", "Signed"]
+
 def edit_on_the_field(user):
     athlete_id = _athlete_id(user)
     if not athlete_id:
@@ -77,7 +81,7 @@ def edit_on_the_field(user):
     cur_feet        = current_h_in // 12 if current_h_in else 0
     cur_inch        = current_h_in % 12 if current_h_in else 0
     current_weight  = user.get("weightLbs") or 0
-
+    current_status  = user.get("recruitingStatus") or "Uncommitted"
     with st.form("edit_onfield_form"):
         col1, col2 = st.columns(2)
         with col1:
@@ -93,7 +97,10 @@ def edit_on_the_field(user):
             new_primary = st.selectbox("Primary sport", sport_options, index=sport_index)
             new_grad    = st.number_input("Graduation year",
                                           value=int(current_grad) if current_grad else 2026,
-                                          min_value=2024, max_value=2035, step=1)
+                                                                                   min_value=2024, max_value=2035, step=1)
+            # Open on the athlete's current status
+            status_index = RECRUITING_STATUSES.index(current_status) if current_status in RECRUITING_STATUSES else 0
+            new_status   = st.selectbox("Recruiting status", RECRUITING_STATUSES, index=status_index)
         with col2:
             new_pos   = st.text_input("Position", value=current_pos)
                         # One box handles adding AND removing other sports.
@@ -136,10 +143,11 @@ def edit_on_the_field(user):
         if new_h_in != (current_h_in or 0):
             payload["heightInches"] = new_h_in if new_h_in > 0 else None
         if int(new_weight) != (current_weight or 0):
-            payload["weightLbs"] = int(new_weight) if new_weight > 0 else None
+                        payload["weightLbs"] = int(new_weight) if new_weight > 0 else None
+        if new_status != current_status:
+            payload["recruitingStatus"] = new_status
 
         _patch(athlete_id, payload, user)
-
 
 # ==================================================================
 # IN THE CLASSROOM
