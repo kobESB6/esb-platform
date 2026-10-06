@@ -68,7 +68,7 @@ st.markdown('<div class="form-title">Create Your ESB Account</div>', unsafe_allo
 # .strip() removes spaces at the start and end, so "  Big C  " saves as "Big C".
 # A name that's only spaces becomes "", which the empty check below catches.
 name = st.text_input("Full Name").strip()
-username = st.text_input("Email or Username")
+username = st.text_input("Email or Username").strip()   # " marcus@esb.com " → "marcus@esb.com"
 role = st.selectbox("Choose a Role", ["Athlete", "Coach", "Legend"])
 password = st.text_input("Password", type="password")
 
@@ -102,8 +102,9 @@ if st.button("Sign Up", key="signup_button"):
     elif any(isinstance(v, str) and not v.strip() for v in extra.values()):
         st.warning("Please fill in all fields for your role.")
     else:
-                     created = create_user(username, password, name, role.lower(), extra)
-    if created:
+        # create_user returns (user, error). error tells us WHY it failed.
+        created, error = create_user(username, password, name, role.lower(), extra)
+        if created:
             # Log the new account in exactly like Login.py does,
             # so the session gets the user AND the token that edits need.
             user, token = authenticate(username, password)
@@ -115,9 +116,12 @@ if st.button("Sign Up", key="signup_button"):
             with st.spinner("Redirecting..."):
                 time.sleep(1.5)
             st.switch_page("pages/RoleRouter.py")  # ✅ Use central router
-    else:
-            st.error("An account with this username already exists.")
-
+        elif error == "unreachable":
+            st.error("Can't reach ESB right now. Please try again in a few minutes.")
+        elif error == "duplicate":
+            st.error("An account with this email already exists. Try logging in instead.")
+        else:
+            st.error("Something went wrong creating your account. Please try again.")
 st.markdown('</div>', unsafe_allow_html=True)
 
 # --- Login redirect button ---

@@ -60,16 +60,24 @@ def create_user(username, password, name, role, extra):
         **extra,
     }
 
+       # Returns (user, error). error is None on success, or one of:
+    #   "unreachable" — server is off, unreachable, or too slow to answer
+    #   "duplicate"   — server said 409, email already registered
+    #   "other"       — any other failure (bad field, server crash)
     try:
-        response = requests.post(url, json=payload)
-        if response.status_code == 201:
-            # Server wraps the new user under the role name: {"coach": {...}}
-            data = response.json()
-            return data.get(role) or data
-        return None
-    except Exception as e:
+        response = requests.post(url, json=payload, timeout=5)
+    except requests.exceptions.RequestException as e:
         print(f"Registration error: {e}")
-        return None
+        return None, "unreachable"
+
+    if response.status_code == 201:
+        # Server wraps the new user under the role name: {"coach": {...}}
+        data = response.json()
+        return data.get(role) or data, None
+    if response.status_code == 409:
+        return None, "duplicate"
+    print(f"Registration failed: {response.status_code} {response.text}")
+    return None, "other"
 
 def auth_headers():
     token = st.session_state.get('token', '')
