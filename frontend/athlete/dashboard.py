@@ -5,7 +5,8 @@
 import streamlit as st
 # Per-section edit forms — each rendered inline under its matching display section.
 from athlete.edit_profile import (
-    edit_on_the_field,
+     edit_on_the_field,
+    edit_football,
     edit_in_the_classroom,
     edit_off_the_field,
     edit_contact,
@@ -139,6 +140,11 @@ def show_athlete_dashboard():
 
     with st.expander("✏️ Edit On The Field"):
         edit_on_the_field(user)
+
+    # Football section shows only for athletes who play Football.
+    if "Football" in (user.get("sportsPlayed") or []):
+        with st.expander("🏈 Edit Football"):
+            edit_football(user)
 
     st.markdown("---")
 

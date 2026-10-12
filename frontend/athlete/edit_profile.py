@@ -12,7 +12,7 @@
 #   A form NEVER writes a searchable value into a blob — no new duplication.
 
 import streamlit as st
-from utils.sports import SPORTS
+from utils.sports import SPORTS, SPORT_REGISTRY
 import requests
 from utils.auth import auth_headers
 def _authpost(*a, **k):   k.setdefault('headers', auth_headers()); return requests.post(*a, **k)
@@ -62,7 +62,7 @@ def _athlete_id(user):
 #   primarySport / position / graduationYear -> columns
 #   #   sportsPlayed -> full list replace; primary always included (built in the form)
 #   heightInches / weightLbs -> columns (already promoted)
-#   fortyTime -> moves to the per-sport football record (sport registry work)
+#  fortyTime -> lives in football_stats now (see edit_football below)
 # ==================================================================
 # Must match the isIn list in backend/models/User.js
 RECRUITING_STATUSES = ["Uncommitted", "Receiving Interest", "Offered",
@@ -148,7 +148,102 @@ def edit_on_the_field(user):
             payload["recruitingStatus"] = new_status
 
         _patch(athlete_id, payload, user)
+        
+# ==================================================================
+# FOOTBALL  (per-sport details -> athlete_sports + football_stats)
+#   Reads/writes /api/athletes/:id/sports/football, NOT the users PATCH.
+#   Position and stat boxes are built from the sport registry, so labels,
+#   ranges, and keys live in one place (utils/sports.py).
+#   An empty stat box means "not set" and saves as null.
+#   Shown only when Football is in sportsPlayed (backend enforces it too).
+# ==================================================================
+def edit_football(user):
+    athlete_id = _athlete_id(user)
+    if not athlete_id:
+        return
 
+    football = SPORT_REGISTRY["Football"]
+    url = f"{API_URL}/api/athletes/{athlete_id}/sports/football"
+
+    # Read the current row so the form opens filled in.
+    try:
+        r = requests.get(url, headers=auth_headers())
+    except Exception as e:
+        st.error(f"Couldn't reach the server: {e}")
+        return
+    if r.status_code != 200:
+        st.error(f"Couldn't load Football details ({r.status_code}): {r.text}")
+        return
+    current = r.json()
+
+    positions   = football["positions"]
+    current_pos = current.get("position")
+    pos_options = ["— Select —"] + positions
+    pos_index   = pos_options.index(current_pos) if current_pos in positions else 0
+
+    with st.form("edit_football_form"):
+        new_pos = st.selectbox("Position", pos_options, index=pos_index)
+
+        st.markdown("**Combine numbers**")
+        new_stats = {}
+        cols = st.columns(2)
+        for i, stat in enumerate(football["stats"]):
+            is_int = isinstance(stat["step"], int)
+            cur = current.get(stat["key"])
+            # Streamlit needs value, min, max, and step to be the same type.
+            # The backend can send 31 for 31.0, so cast to match.
+            if cur is not None:
+                cur = int(cur) if is_int else float(cur)
+            # Streamlit only lets a number box be emptied if it was created
+            # with value=None. So create it empty-able, and fill in the saved
+            # number through session_state (first load only, so the
+            # athlete's typing isn't overwritten). Athlete ID in the key keeps
+            # two logins in one browser from sharing boxes.
+            widget_key = f"fb_{athlete_id}_{stat['key']}"
+            if widget_key not in st.session_state:
+                st.session_state[widget_key] = cur
+            with cols[i % 2]:
+                new_stats[stat["key"]] = st.number_input(
+                    f'{stat["label"]} ({stat["unit"]})',
+                    min_value=stat["min"], max_value=stat["max"], step=stat["step"],
+                    value=None, placeholder="Not set", key=widget_key,
+                    format=None if is_int else ("%.2f" if stat["step"] < 0.1 else "%.1f"),
+                )
+        saved = st.form_submit_button("Save Football")
+
+    if saved:
+        # Send only what changed.
+        payload = {}
+        final_pos = None if new_pos == "— Select —" else new_pos
+        if final_pos != current_pos:
+            payload["position"] = final_pos
+        for stat in football["stats"]:
+            key     = stat["key"]
+            new_val = new_stats[key]
+            old_val = current.get(key)
+            if new_val is None and old_val is None:
+                continue
+            if new_val is None or old_val is None or abs(float(new_val) - float(old_val)) > 1e-6:
+                payload[key] = new_val
+
+        if not payload:
+            st.info("No changes to save.")
+            return
+        try:
+            resp = _authpatch(url, json=payload)
+        except Exception as e:
+            st.error(f"Couldn't reach the server: {e}")
+            return
+        if resp.status_code == 200:
+            st.success("✅ Football saved!")
+            st.switch_page("pages/RoleRouter.py")
+        else:
+            # Show the backend's own message (e.g. "fortyTime must be between...").
+            try:
+                msg = resp.json().get("error", resp.text)
+            except Exception:
+                msg = resp.text
+            st.error(f"Couldn't save Football ({resp.status_code}): {msg}")
 # ==================================================================
 # IN THE CLASSROOM
 #   gpa / school -> COLUMNS (searchable)
