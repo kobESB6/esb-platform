@@ -45,7 +45,8 @@ SPORT_REGISTRY = {
             {"key": "benchMaxLbs",    "label": "Bench max",          "unit": "lbs",
              "min": 0,   "max": 500,  "step": 5},
         ],
-        "look": {"color": "#1B5E20", "text": "#FFFFFF", "icon": "🏈"},
+                "look": {"color": "#1B5E20", "text": "#FFFFFF", "icon": "🏈"},
+        "slug": "football",
     },
     "Basketball":    {"positions": ["PG", "SG", "SF", "PF", "C"]},
     "Baseball":      {"positions": ["Pitcher", "Catcher", "1B", "2B", "3B", "SS", "OF"]},
@@ -87,8 +88,12 @@ SPORT_REGISTRY = {
             {"name": "Pole Vault",   "kind": "distance", "min": 60,    "max": 240},
             {"name": "Shot Put",     "kind": "distance", "min": 120,   "max": 840},
             {"name": "Discus",       "kind": "distance", "min": 360,   "max": 2640},
-            {"name": "Javelin",      "kind": "distance", "min": 360,   "max": 3000},
+                        {"name": "Javelin",      "kind": "distance", "min": 360,   "max": 3000},
         ],
+        # Track-surface red. "slug" is the web-address name, since "&" and
+        # spaces break URLs: /api/athletes/:id/sports/track-field
+        "look": {"color": "#A63A2B", "text": "#FFFFFF", "icon": "🏃"},
+        "slug": "track-field",
     },
 }
 

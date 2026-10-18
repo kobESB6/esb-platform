@@ -10,6 +10,7 @@ import streamlit as st
 from utils.auth import auth_headers
 from utils.config import API_BASE
 from utils.sports import SPORT_REGISTRY
+from utils.marks import format_mark
 
 _CSS = (
     "<style>"
@@ -28,6 +29,8 @@ _CSS = (
     ".esb-card-stat{background:rgba(0,0,0,.25);border-radius:8px;padding:6px 8px}"
     ".esb-card-stat b{display:block;font-size:20px}"
     ".esb-card-stat span{font-size:11px;opacity:.85;text-transform:uppercase;letter-spacing:.05em}"
+        ".esb-card-pos.long{font-size:34px;margin-top:20px}"
+    ".esb-card-more{grid-column:1/-1;font-size:11px;opacity:.85;text-align:center;letter-spacing:.05em}"
     ".esb-card-foot{font-size:10px;letter-spacing:.2em;opacity:.7;text-align:center;margin-top:8px}"
     "</style>"
 )
@@ -35,8 +38,10 @@ _CSS = (
 
 def fetch_sport_row(athlete_id, sport):
     """Read an athlete's row for one sport. Returns the route's JSON, or None."""
+        # The registry's slug is the web-address name ("track-field", not "track & field").
+    slug = SPORT_REGISTRY.get(sport, {}).get("slug", sport.lower())
     try:
-        r = requests.get(f"{API_BASE}/api/athletes/{athlete_id}/sports/{sport.lower()}",
+        r = requests.get(f"{API_BASE}/api/athletes/{athlete_id}/sports/{slug}",
                          headers=auth_headers(), timeout=5)
     except Exception:
         return None
@@ -70,17 +75,34 @@ def render_sport_card(sport, row, user):
     if not row.get("exists"):
         meta = f"Add your {sport} details below"
 
-    stats_html = "".join(
-        f'<div class="esb-card-stat"><b>{e(_fmt(row.get(s["key"]), s))}</b>'
-        f'<span>{e(s["label"])}</span></div>'
-        for s in info.get("stats", [])
-    )
+    if info.get("events"):
+        # Track & Field: events, not a position. Best marks in registry order,
+        # up to 4 boxes. The first event is the big text.
+        marks = row.get("marks") or {}
+        shown = [ev for ev in info["events"] if ev["name"] in marks]
+        position = shown[0]["name"] if shown else "—"
+        if row.get("exists") and not shown:
+            meta = f"Add your {sport} marks below"
+        stats_html = "".join(
+            f'<div class="esb-card-stat"><b>{e(format_mark(ev["kind"], marks[ev["name"]]))}</b>'
+            f'<span>{e(ev["name"])}</span></div>'
+            for ev in shown[:4]
+        )
+        extra = len(shown) - 4
+        if extra > 0:
+            stats_html += f'<div class="esb-card-more">+{extra} more event{"s" if extra > 1 else ""}</div>'
+    else:
+        stats_html = "".join(
+            f'<div class="esb-card-stat"><b>{e(_fmt(row.get(s["key"]), s))}</b>'
+            f'<span>{e(s["label"])}</span></div>'
+            for s in info.get("stats", [])
+        )
 
     # No indented lines: Streamlit treats indented HTML as a code block.
     card = (
         f'<div class="esb-card" style="--c:{look["color"]};--t:{look["text"]}">'
         f'<div class="esb-card-top"><span>{look["icon"]} {e(sport)}</span><span>{star}</span></div>'
-        f'<div class="esb-card-pos">{e(position)}</div>'
+        f'<div class="esb-card-pos{" long" if len(position) > 5 else ""}">{e(position)}</div>'
         f'<div class="esb-card-name">{e(user.get("name") or "")}</div>'
         f'<div class="esb-card-meta">{e(meta)}</div>'
         f'<div class="esb-card-stats">{stats_html}</div>'
