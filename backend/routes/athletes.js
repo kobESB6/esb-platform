@@ -11,7 +11,8 @@ const { deepMerge } = require('../utils/deepMerge');
 const { signToken, requireAuth, requireSelf } = require('../middleware/auth');
 const AthleteSport  = require('../models/AthleteSport');
 const FootballStats = require('../models/FootballStats');
-const { FOOTBALL }  = require('../config/sportRules');
+const TrackMark     = require('../models/TrackMark');
+const { FOOTBALL, TRACK } = require('../config/sportRules');
 const { attachMediaRoutes } = require('./mediaRoutes');
 // NOTE: readAthletes/writeAthletes helpers are GONE — the DB is our store now.
 
@@ -430,7 +431,118 @@ router.patch('/:id/sports/football', requireAuth, requireSelf, async (req, res) 
     res.json(footballView(fresh));
   } catch (error) {
     console.error('PATCH football failed:', error);
-    res.status(500).json({ error: 'Could not save Football details' });
+       res.status(500).json({ error: 'Could not save Football details' });
+  }
+});
+
+// ==================================================================
+// TRACK & FIELD DETAILS  — /api/athletes/:id/sports/track-field
+// "track-field" in the address because "&" and spaces break URLs.
+// Shape in and out: { marks: { "100m": 10.85, "Long Jump": 258 } }
+// PATCH only touches the events it's sent. null or "" deletes that mark.
+// ==================================================================
+const TRACK_SPORT = 'Track & Field';
+
+function trackView(row) {
+  const marks = {};
+  if (row && row.trackMarks) {
+    const byEvent = {};
+    for (const m of row.trackMarks) byEvent[m.event] = m.mark;
+    // Registry order, so the form and card always list events the same way.
+    for (const name of Object.keys(TRACK.events)) {
+      if (name in byEvent) marks[name] = byEvent[name];
+    }
+  }
+  return { sport: TRACK_SPORT, exists: !!row, marks };
+}
+
+async function loadTrack(userId) {
+  return AthleteSport.findOne({
+    where: { userId, sport: TRACK_SPORT },
+    include: [{ model: TrackMark, as: 'trackMarks' }],
+  });
+}
+
+// GET — any logged-in user can read (coaches view athletes).
+router.get('/:id/sports/track-field', requireAuth, async (req, res) => {
+  try {
+    const athlete = await User.findByPk(req.params.id, { attributes: ['id', 'role'] });
+    if (!athlete || athlete.role !== 'athlete') {
+      return res.status(404).json({ error: 'Athlete not found' });
+    }
+    const row = await loadTrack(athlete.id);
+    res.json(trackView(row));
+  } catch (error) {
+    console.error('GET track failed:', error);
+    res.status(500).json({ error: 'Could not retrieve Track & Field details' });
+  }
+});
+
+// PATCH — athletes edit only their own. Creates the Track row on first save.
+router.patch('/:id/sports/track-field', requireAuth, requireSelf, async (req, res) => {
+  try {
+    const user = await User.findByPk(req.params.id);
+    if (!user || user.role !== 'athlete') {
+      return res.status(404).json({ error: 'Athlete not found' });
+    }
+    if (!(user.sportsPlayed || []).includes(TRACK_SPORT)) {
+      return res.status(400).json({ error: 'Add Track & Field to your sports before saving Track details' });
+    }
+
+    const { marks } = req.body;
+    if (marks === undefined || marks === null || typeof marks !== 'object' || Array.isArray(marks)) {
+      return res.status(400).json({ error: 'marks must be an object, like {"100m": 10.85}' });
+    }
+
+    // Check every mark BEFORE saving any. One bad mark = nothing saved.
+    const changes = [];
+    for (const [event, v] of Object.entries(marks)) {
+      const rule = TRACK.events[event];
+      if (!rule) {
+        return res.status(400).json({ error: `Unknown Track event: ${event}` });
+      }
+      if (v === null || v === '') { changes.push({ event, mark: null }); continue; }
+      if (typeof v !== 'number' && typeof v !== 'string') {
+        return res.status(400).json({ error: `${event} must be a number` });
+      }
+      const n = Number(v);
+      if (!Number.isFinite(n)) {
+        return res.status(400).json({ error: `${event} must be a number` });
+      }
+      if (n < rule.min || n > rule.max) {
+        const unit = rule.kind === 'time' ? 'seconds' : 'inches';
+        return res.status(400).json({ error: `${event} must be between ${rule.min} and ${rule.max} ${unit}` });
+      }
+      changes.push({ event, mark: n });
+    }
+
+    // All marks in one transaction: all or nothing.
+    await AthleteSport.sequelize.transaction(async (t) => {
+      const [row] = await AthleteSport.findOrCreate({
+        where: { userId: user.id, sport: TRACK_SPORT },
+        transaction: t,
+      });
+      for (const { event, mark } of changes) {
+        const existing = await TrackMark.findOne({
+          where: { athleteSportId: row.id, event },
+          transaction: t,
+        });
+        if (mark === null) {
+          if (existing) await existing.destroy({ transaction: t });
+        } else if (existing) {
+          existing.mark = mark;
+          await existing.save({ transaction: t });
+        } else {
+          await TrackMark.create({ athleteSportId: row.id, event, mark }, { transaction: t });
+        }
+      }
+    });
+
+    const fresh = await loadTrack(user.id);
+    res.json(trackView(fresh));
+  } catch (error) {
+    console.error('PATCH track failed:', error);
+    res.status(500).json({ error: 'Could not save Track & Field details' });
   }
 });
 module.exports = router;

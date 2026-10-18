@@ -7,6 +7,7 @@ import streamlit as st
 from athlete.edit_profile import (
      edit_on_the_field,
     edit_football,
+    edit_track,
     edit_in_the_classroom,
     edit_off_the_field,
     edit_contact,
@@ -155,6 +156,11 @@ def show_athlete_dashboard():
     if "Football" in (user.get("sportsPlayed") or []):
         with st.expander("🏈 Edit Football"):
             edit_football(user)
+
+    # Track & Field section shows only for athletes who run Track.
+    if "Track & Field" in (user.get("sportsPlayed") or []):
+        with st.expander("🏃 Edit Track & Field"):
+            edit_track(user)
 
     st.markdown("---")
 
