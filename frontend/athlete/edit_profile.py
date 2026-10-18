@@ -13,6 +13,7 @@
 
 import streamlit as st
 from utils.sports import SPORTS, SPORT_REGISTRY
+from utils.marks import parse_mark, format_mark
 import requests
 from utils.auth import auth_headers
 def _authpost(*a, **k):   k.setdefault('headers', auth_headers()); return requests.post(*a, **k)
@@ -243,7 +244,117 @@ def edit_football(user):
                 msg = resp.json().get("error", resp.text)
             except Exception:
                 msg = resp.text
-            st.error(f"Couldn't save Football ({resp.status_code}): {msg}")
+                st.error(f"Couldn't save Football ({resp.status_code}): {msg}")
+
+# ==================================================================
+# TRACK & FIELD  (per-sport details -> athlete_sports + track_marks)
+#   Reads/writes /api/athletes/:id/sports/track-field.
+#   "Your events" picker sits OUTSIDE the form so mark boxes appear as
+#   soon as an event is picked. Mark boxes are text, so athletes type
+#   10.85, 2:05.30, or 21' 6" like a results sheet. utils/marks.py
+#   turns those into seconds or inches for saving.
+#   Removing an event from the picker deletes its mark on save.
+# ==================================================================
+TRACK_SPORT = "Track & Field"
+
+
+def edit_track(user):
+    athlete_id = _athlete_id(user)
+    if not athlete_id:
+        return
+
+    events = SPORT_REGISTRY[TRACK_SPORT]["events"]
+    by_name = {e["name"]: e for e in events}
+    names = [e["name"] for e in events]
+    url = f"{API_URL}/api/athletes/{athlete_id}/sports/track-field"
+
+    # Read the saved marks so the form opens filled in.
+    try:
+        r = requests.get(url, headers=auth_headers())
+    except Exception as e:
+        st.error(f"Couldn't reach the server: {e}")
+        return
+    if r.status_code != 200:
+        st.error(f"Couldn't load Track & Field details ({r.status_code}): {r.text}")
+        return
+    saved_marks = r.json().get("marks") or {}
+
+    # Picker: starts with the events that already have a mark.
+    # Athlete ID in every key keeps two logins in one browser apart.
+    prefix = f"tf_{athlete_id}_"
+    pick_key = prefix + "events"
+    if pick_key not in st.session_state:
+        st.session_state[pick_key] = [n for n in names if n in saved_marks]
+    picked = st.multiselect(
+        "Your events", names, key=pick_key,
+        help="Pick every event you compete in. Removing one deletes its mark when you save.",
+    )
+    picked = [n for n in names if n in picked]   # always registry order
+    if not picked:
+        st.caption("Pick your events above, then enter your best mark for each.")
+
+    with st.form("edit_track_form"):
+        typed = {}
+        cols = st.columns(2)
+        for i, name in enumerate(picked):
+            ev = by_name[name]
+            hint = "10.85 or 2:05.30" if ev["kind"] == "time" else "21' 6\" or 21-6"
+            box_key = prefix + name
+            if box_key not in st.session_state:
+                st.session_state[box_key] = format_mark(ev["kind"], saved_marks.get(name))
+            with cols[i % 2]:
+                typed[name] = st.text_input(f"{name} best", key=box_key, placeholder=hint)
+        saved = st.form_submit_button("Save Track & Field")
+
+    if saved:
+        changes, errors = {}, []
+        for name in picked:
+            ev = by_name[name]
+            try:
+                val = parse_mark(ev["kind"], typed[name])
+            except ValueError as e:
+                errors.append(f"{name}: {e}")
+                continue
+            if val is not None and not (ev["min"] <= val <= ev["max"]):
+                low  = format_mark(ev["kind"], ev["min"])
+                high = format_mark(ev["kind"], ev["max"])
+                errors.append(f"{name}: must be between {low} and {high}")
+                continue
+            old = saved_marks.get(name)
+            if val is None and old is None:
+                continue
+            if val is None or old is None or abs(val - float(old)) > 1e-6:
+                changes[name] = val
+        # Events taken out of the picker: delete their marks.
+        for name in saved_marks:
+            if name not in picked:
+                changes[name] = None
+
+        if errors:
+            for msg in errors:
+                st.error(msg)
+            return
+        if not changes:
+            st.info("No changes to save.")
+            return
+        try:
+            resp = _authpatch(url, json={"marks": changes})
+        except Exception as e:
+            st.error(f"Couldn't reach the server: {e}")
+            return
+        if resp.status_code == 200:
+            # Forget what was typed so the form reloads from the saved marks.
+            for k in [k for k in st.session_state if str(k).startswith(prefix)]:
+                del st.session_state[k]
+            st.success("✅ Track & Field saved!")
+            st.switch_page("pages/RoleRouter.py")
+        else:
+            try:
+                msg = resp.json().get("error", resp.text)
+            except Exception:
+                msg = resp.text
+            st.error(f"Couldn't save Track & Field ({resp.status_code}): {msg}")
+
 # ==================================================================
 # IN THE CLASSROOM
 #   gpa / school -> COLUMNS (searchable)
