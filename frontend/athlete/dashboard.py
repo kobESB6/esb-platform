@@ -17,6 +17,8 @@ from athlete.edit_profile import (
 
 from utils.config import API_BASE
 from utils.auth import logout
+from utils.sports import SPORT_REGISTRY
+from utils.sport_card import fetch_sport_row, render_sport_card
 MEDIA_BASE = API_BASE   # backend origin that serves /uploads, from utils/config.py
 def show_athlete_dashboard():
 
@@ -82,6 +84,14 @@ def show_athlete_dashboard():
         st.markdown(f"**School:** {school}")
         st.markdown(f"**Graduation Year:** {grad_year}")
         st.markdown(f"**Recruiting Status:** {recruiting_status}")
+
+       # -- SPORT CARDS: one per sport the registry has a look for (Football now) --
+    card_sports = [s for s in sports_played if SPORT_REGISTRY.get(s, {}).get("look")]
+    if card_sports:
+        card_cols = st.columns(min(len(card_sports), 3))
+        for i, sport in enumerate(card_sports):
+            with card_cols[i % len(card_cols)]:
+                render_sport_card(sport, fetch_sport_row(user.get("id"), sport), user)
 
     st.markdown("**🎥 Highlights**")
     highlights = on_field.get("highlights", [])
