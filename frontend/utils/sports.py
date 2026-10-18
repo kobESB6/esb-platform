@@ -16,3 +16,59 @@ SPORTS = [
     "Track & Field", "Volleyball", "Softball", "Wrestling", "Tennis",
     "Golf", "Swimming", "Cross Country", "Lacrosse", "Other",
 ]
+
+
+# ==================================================================
+# SPORT REGISTRY — everything ESB knows about each sport.
+#
+#   positions : the choices for Position (or Events for Track & Field).
+#               Spelled exactly as coach wishlists save them — change a
+#               name here and saved wishlists stop matching.
+#   stats     : searchable stats. Each "key" is the real column name in
+#               that sport's stats table (football_stats, etc.), so the
+#               form, the route, and the database all use one name.
+#   look      : colors and icon for the sport card.
+#
+# Football is the first full sport. The others only have positions
+# for now; they get stats and a look when we build them.
+# ==================================================================
+SPORT_REGISTRY = {
+    "Football": {
+        "positions": ["QB", "RB", "WR", "TE", "OL", "DL", "LB", "DB", "K/P"],
+        "stats": [
+            {"key": "fortyTime",      "label": "40-yard dash",       "unit": "sec",
+             "min": 3.5, "max": 9.0,  "step": 0.01},
+            {"key": "shuttleTime",    "label": "Pro shuttle (5-10-5)", "unit": "sec",
+             "min": 3.5, "max": 8.0,  "step": 0.01},
+            {"key": "verticalInches", "label": "Vertical jump",      "unit": "in",
+             "min": 0.0, "max": 50.0, "step": 0.5},
+            {"key": "benchMaxLbs",    "label": "Bench max",          "unit": "lbs",
+             "min": 0,   "max": 500,  "step": 5},
+        ],
+        "look": {"color": "#1B5E20", "text": "#FFFFFF", "icon": "🏈"},
+    },
+    "Basketball":    {"positions": ["PG", "SG", "SF", "PF", "C"]},
+    "Baseball":      {"positions": ["Pitcher", "Catcher", "1B", "2B", "3B", "SS", "OF"]},
+    "Softball":      {"positions": ["Pitcher", "Catcher", "1B", "2B", "3B", "SS", "OF"]},
+    "Soccer":        {"positions": ["Goalkeeper", "Defender", "Midfielder", "Forward"]},
+    "Volleyball":    {"positions": ["Setter", "Outside Hitter", "Middle Blocker",
+                                    "Opposite", "Libero"]},
+    "Wrestling":     {"positions": ["106", "113", "120", "126", "132", "138", "145",
+                                    "152", "160", "170", "182", "195", "220", "285"]},
+    "Track & Field": {"positions": ["100m", "200m", "400m", "800m", "1600m", "3200m",
+                                    "110m Hurdles", "300m Hurdles", "Long Jump",
+                                    "High Jump", "Triple Jump", "Pole Vault",
+                                    "Shot Put", "Discus", "Javelin", "Relays"]},
+}
+
+# Spelling guard: every registry sport must be on the SPORTS list,
+# or coach filters and athlete rows won't match. Fails loudly on a typo.
+for _name in SPORT_REGISTRY:
+    assert _name in SPORTS, f"Registry sport {_name!r} is not in SPORTS"
+
+# Same shape the coach wishlist already uses, now built from the registry.
+POSITIONS_BY_SPORT = {
+    name: info["positions"]
+    for name, info in SPORT_REGISTRY.items()
+    if info.get("positions")
+}

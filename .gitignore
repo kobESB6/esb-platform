@@ -40,3 +40,4 @@ backend/.env
 # Local backup copies and test media (never commit)
 *.bak*
 _test_media/
+frontend/.venv-old-intel/
