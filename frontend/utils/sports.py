@@ -55,10 +55,41 @@ SPORT_REGISTRY = {
                                     "Opposite", "Libero"]},
     "Wrestling":     {"positions": ["106", "113", "120", "126", "132", "138", "145",
                                     "152", "160", "170", "182", "195", "220", "285"]},
-    "Track & Field": {"positions": ["100m", "200m", "400m", "800m", "1600m", "3200m",
-                                    "110m Hurdles", "300m Hurdles", "Long Jump",
-                                    "High Jump", "Triple Jump", "Pole Vault",
-                                    "Shot Put", "Discus", "Javelin", "Relays"]},
+        # Track & Field has EVENTS, not one position. Two lists:
+    #   positions : what coach wishlists save. Never rename these. Adding is safe.
+    #   events    : what an athlete enters a best mark for. One mark per event.
+    #               kind "time"     = saved as seconds  (2:05.30 -> 125.30)
+    #               kind "distance" = saved as inches   (21' 6" -> 258)
+    #               min/max are in those same units. Relay splits run faster
+    #               than open races, so they are their own events.
+    "Track & Field": {
+        "positions": ["100m", "200m", "400m", "800m", "1600m", "3200m",
+                      "100m Hurdles", "110m Hurdles", "300m Hurdles", "400m Hurdles",
+                      "Long Jump", "High Jump", "Triple Jump", "Pole Vault",
+                      "Shot Put", "Discus", "Javelin", "Relays"],
+        "events": [
+            {"name": "100m",         "kind": "time",     "min": 9.5,   "max": 20.0},
+            {"name": "200m",         "kind": "time",     "min": 19.0,  "max": 40.0},
+            {"name": "400m",         "kind": "time",     "min": 43.0,  "max": 90.0},
+            {"name": "800m",         "kind": "time",     "min": 100.0, "max": 240.0},
+            {"name": "1600m",        "kind": "time",     "min": 220.0, "max": 600.0},
+            {"name": "3200m",        "kind": "time",     "min": 480.0, "max": 1200.0},
+            {"name": "100m Hurdles", "kind": "time",     "min": 12.0,  "max": 25.0},
+            {"name": "110m Hurdles", "kind": "time",     "min": 12.5,  "max": 25.0},
+            {"name": "300m Hurdles", "kind": "time",     "min": 34.0,  "max": 70.0},
+            {"name": "400m Hurdles", "kind": "time",     "min": 46.0,  "max": 90.0},
+            {"name": "4x100 Split",  "kind": "time",     "min": 9.0,   "max": 15.0},
+            {"name": "4x400 Split",  "kind": "time",     "min": 42.0,  "max": 80.0},
+            {"name": "4x800 Split",  "kind": "time",     "min": 100.0, "max": 240.0},
+            {"name": "Long Jump",    "kind": "distance", "min": 120,   "max": 330},
+            {"name": "Triple Jump",  "kind": "distance", "min": 240,   "max": 660},
+            {"name": "High Jump",    "kind": "distance", "min": 36,    "max": 96},
+            {"name": "Pole Vault",   "kind": "distance", "min": 60,    "max": 240},
+            {"name": "Shot Put",     "kind": "distance", "min": 120,   "max": 840},
+            {"name": "Discus",       "kind": "distance", "min": 360,   "max": 2640},
+            {"name": "Javelin",      "kind": "distance", "min": 360,   "max": 3000},
+        ],
+    },
 }
 
 # Spelling guard: every registry sport must be on the SPORTS list,
