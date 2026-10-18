@@ -11,7 +11,7 @@
 #   A form NEVER writes a searchable value into a blob.
 
 import streamlit as st
-from utils.sports import SPORTS
+from utils.sports import SPORTS, POSITIONS_BY_SPORT
 import requests
 from utils.auth import auth_headers
 def _authpost(*a, **k):   k.setdefault('headers', auth_headers()); return requests.post(*a, **k)
@@ -153,26 +153,9 @@ def edit_contact(user):
             payload["offTheField"] = {"socialLinks": {**social, **link_changes}}
         _patch(coach_id, payload, user)    
 
-   # Sport-keyed positions/events map — TEMPORARY.
-# TODO: extract to a shared sports taxonomy module (`utils/sports.py`) so the
-# athlete sports editor imports the SAME source. Hardcoded twice = drift.
-# Note Track & Field has EVENTS, not positions — the key is per-sport shape,
-# not one flat list. A football coach must never see "Goalkeeper".
-POSITIONS_BY_SPORT = {
-    "Football":      ["QB", "RB", "WR", "TE", "OL", "DL", "LB", "DB", "K/P"],
-    "Basketball":    ["PG", "SG", "SF", "PF", "C"],
-    "Baseball":      ["Pitcher", "Catcher", "1B", "2B", "3B", "SS", "OF"],
-    "Softball":      ["Pitcher", "Catcher", "1B", "2B", "3B", "SS", "OF"],
-    "Soccer":        ["Goalkeeper", "Defender", "Midfielder", "Forward"],
-    "Volleyball":    ["Setter", "Outside Hitter", "Middle Blocker",
-                      "Opposite", "Libero"],
-    "Wrestling":     ["106", "113", "120", "126", "132", "138", "145",
-                      "152", "160", "170", "182", "195", "220", "285"],
-    "Track & Field": ["100m", "200m", "400m", "800m", "1600m", "3200m",
-                      "110m Hurdles", "300m Hurdles", "Long Jump",
-                      "High Jump", "Triple Jump", "Pole Vault",
-                      "Shot Put", "Discus", "Javelin", "Relays"],
-}
+  # Positions/events come from the sport registry (utils/sports.py), imported
+# above. Coaches and athletes read the same source, so names never drift.
+# Each sport keeps its own list: a football coach never sees "Goalkeeper".
 
 # Wishlist sports come from the shared SPORTS list (same names athletes pick).
 # "Other" is left out — a coach can't recruit for an unnamed sport.
