@@ -54,7 +54,13 @@ def _fmt(value, stat):
     if isinstance(stat["step"], int):
         shown = str(int(value))
     else:
-        shown = f"{value:.2f}" if stat["step"] < 0.1 else f"{value:.1f}"
+                # Decimals follow the step: 0.001 -> 3 (batting avg), 0.01 -> 2, else 1.
+        if stat["step"] < 0.01:
+            shown = f"{value:.3f}"
+        elif stat["step"] < 0.1:
+            shown = f"{value:.2f}"
+        else:
+            shown = f"{value:.1f}"
     return f"{shown} {stat['unit']}"
 
 

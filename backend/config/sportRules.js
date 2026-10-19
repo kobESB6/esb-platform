@@ -41,4 +41,16 @@ const TRACK = {
   },
 };
 
-module.exports = { FOOTBALL, TRACK };
+// Softball: positions + fixed stats, same pattern as Football.
+// MUST MATCH the Softball entry in frontend/utils/sports.py.
+const SOFTBALL = {
+  positions: ['Pitcher', 'Catcher', '1B', '2B', '3B', 'SS', 'OF'],
+  stats: {
+    battingAvg:    { min: 0,   max: 1.0 },
+    homeToFirst:   { min: 2.3, max: 5.0 },
+    pitchSpeedMph: { min: 30,  max: 80, integer: true },
+    era:           { min: 0,   max: 30.0 },
+  },
+};
+
+module.exports = { FOOTBALL, TRACK, SOFTBALL };

@@ -50,7 +50,27 @@ SPORT_REGISTRY = {
     },
     "Basketball":    {"positions": ["PG", "SG", "SF", "PF", "C"]},
     "Baseball":      {"positions": ["Pitcher", "Catcher", "1B", "2B", "3B", "SS", "OF"]},
-    "Softball":      {"positions": ["Pitcher", "Catcher", "1B", "2B", "3B", "SS", "OF"]},
+       # Softball: two stats for every hitter, two for pitchers.
+    #   battingAvg    : 0.345 style, saved as a decimal
+    #   homeToFirst   : seconds from swing to first base
+    #   pitchSpeedMph : top pitch speed, whole mph
+    #   era           : earned run average (7-inning games)
+    "Softball": {
+        "positions": ["Pitcher", "Catcher", "1B", "2B", "3B", "SS", "OF"],
+        "stats": [
+            {"key": "battingAvg",    "label": "Batting average", "unit": "AVG",
+             "min": 0.0, "max": 1.0,  "step": 0.001},
+            {"key": "homeToFirst",   "label": "Home to first",   "unit": "sec",
+             "min": 2.3, "max": 5.0,  "step": 0.01},
+            {"key": "pitchSpeedMph", "label": "Pitch speed",     "unit": "mph",
+             "min": 30,  "max": 80,   "step": 1},
+            {"key": "era",           "label": "Earned run average", "unit": "ERA",
+             "min": 0.0, "max": 30.0, "step": 0.01},
+        ],
+        # Softball optic yellow with dark text so it's easy to read.
+        "look": {"color": "#F2C200", "text": "#1A1A1A", "icon": "🥎"},
+        "slug": "softball",
+    },
     "Soccer":        {"positions": ["Goalkeeper", "Defender", "Midfielder", "Forward"]},
     "Volleyball":    {"positions": ["Setter", "Outside Hitter", "Middle Blocker",
                                     "Opposite", "Libero"]},
