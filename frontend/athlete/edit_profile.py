@@ -243,9 +243,8 @@ def edit_football(user):
             try:
                 msg = resp.json().get("error", resp.text)
             except Exception:
-                msg = resp.text
-                st.error(f"Couldn't save Football ({resp.status_code}): {msg}")
-
+                               msg = resp.text
+            st.error(f"Couldn't save Football ({resp.status_code}): {msg}")
 # ==================================================================
 # SOFTBALL  (per-sport details -> athlete_sports + softball_stats)
 #   Reads/writes /api/athletes/:id/sports/softball.
