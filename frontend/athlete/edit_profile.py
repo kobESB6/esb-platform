@@ -243,8 +243,106 @@ def edit_football(user):
             try:
                 msg = resp.json().get("error", resp.text)
             except Exception:
+                               msg = resp.text
+            st.error(f"Couldn't save Football ({resp.status_code}): {msg}")
+# ==================================================================
+# SOFTBALL  (per-sport details -> athlete_sports + softball_stats)
+#   Reads/writes /api/athletes/:id/sports/softball.
+#   Same pattern as Football: position + 4 fixed stats from the registry.
+# ==================================================================
+def edit_softball(user):
+    athlete_id = _athlete_id(user)
+    if not athlete_id:
+        return
+
+    softball = SPORT_REGISTRY["Softball"]
+    url = f"{API_URL}/api/athletes/{athlete_id}/sports/softball"
+
+    # Read the current row so the form opens filled in.
+    try:
+        r = requests.get(url, headers=auth_headers())
+    except Exception as e:
+        st.error(f"Couldn't reach the server: {e}")
+        return
+    if r.status_code != 200:
+        st.error(f"Couldn't load Softball details ({r.status_code}): {r.text}")
+        return
+    current = r.json()
+
+    positions   = softball["positions"]
+    current_pos = current.get("position")
+    pos_options = ["— Select —"] + positions
+    pos_index   = pos_options.index(current_pos) if current_pos in positions else 0
+
+    with st.form("edit_softball_form"):
+        new_pos = st.selectbox("Position", pos_options, index=pos_index)
+
+        st.markdown("**Softball numbers**")
+        new_stats = {}
+        cols = st.columns(2)
+        for i, stat in enumerate(softball["stats"]):
+            is_int = isinstance(stat["step"], int)
+            cur = current.get(stat["key"])
+            # Streamlit needs value, min, max, and step to be the same type.
+            if cur is not None:
+                cur = int(cur) if is_int else float(cur)
+            # Empty-able number box: create with value=None and fill the saved
+            # number through session_state on first load only (same trick as
+            # Football). Athlete ID in the key keeps two logins apart.
+            widget_key = f"sb_{athlete_id}_{stat['key']}"
+            if widget_key not in st.session_state:
+                st.session_state[widget_key] = cur
+            # Decimals follow the step: 0.001 -> 3 (batting avg), 0.01 -> 2.
+            if is_int:
+                fmt = None
+            elif stat["step"] < 0.01:
+                fmt = "%.3f"
+            elif stat["step"] < 0.1:
+                fmt = "%.2f"
+            else:
+                fmt = "%.1f"
+            with cols[i % 2]:
+                new_stats[stat["key"]] = st.number_input(
+                    f'{stat["label"]} ({stat["unit"]})',
+                    min_value=stat["min"], max_value=stat["max"], step=stat["step"],
+                    value=None, placeholder="Not set", key=widget_key,
+                    format=fmt,
+                )
+        saved = st.form_submit_button("Save Softball")
+
+    if saved:
+        # Send only what changed.
+        payload = {}
+        final_pos = None if new_pos == "— Select —" else new_pos
+        if final_pos != current_pos:
+            payload["position"] = final_pos
+        for stat in softball["stats"]:
+            key     = stat["key"]
+            new_val = new_stats[key]
+            old_val = current.get(key)
+            if new_val is None and old_val is None:
+                continue
+            if new_val is None or old_val is None or abs(float(new_val) - float(old_val)) > 1e-6:
+                payload[key] = new_val
+
+        if not payload:
+            st.info("No changes to save.")
+            return
+        try:
+            resp = _authpatch(url, json=payload)
+        except Exception as e:
+            st.error(f"Couldn't reach the server: {e}")
+            return
+        if resp.status_code == 200:
+            st.success("✅ Softball saved!")
+            st.switch_page("pages/RoleRouter.py")
+        else:
+            # Show the backend's own message (e.g. "era must be between...").
+            try:
+                msg = resp.json().get("error", resp.text)
+            except Exception:
                 msg = resp.text
-                st.error(f"Couldn't save Football ({resp.status_code}): {msg}")
+            st.error(f"Couldn't save Softball ({resp.status_code}): {msg}")
 
 # ==================================================================
 # TRACK & FIELD  (per-sport details -> athlete_sports + track_marks)

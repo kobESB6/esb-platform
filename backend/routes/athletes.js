@@ -12,7 +12,8 @@ const { signToken, requireAuth, requireSelf } = require('../middleware/auth');
 const AthleteSport  = require('../models/AthleteSport');
 const FootballStats = require('../models/FootballStats');
 const TrackMark     = require('../models/TrackMark');
-const { FOOTBALL, TRACK } = require('../config/sportRules');
+const SoftballStats = require('../models/SoftballStats');
+const { FOOTBALL, TRACK, SOFTBALL } = require('../config/sportRules');
 const { attachMediaRoutes } = require('./mediaRoutes');
 // NOTE: readAthletes/writeAthletes helpers are GONE — the DB is our store now.
 
@@ -432,6 +433,129 @@ router.patch('/:id/sports/football', requireAuth, requireSelf, async (req, res) 
   } catch (error) {
     console.error('PATCH football failed:', error);
        res.status(500).json({ error: 'Could not save Football details' });
+  }
+});
+
+// ==================================================================
+// SOFTBALL DETAILS  — /api/athletes/:id/sports/softball
+// Same shape as Football: position, stats blob, and the 4 stat columns
+// side by side, so Streamlit fills the form from GET and sends the same
+// keys back on PATCH.
+// ==================================================================
+function softballView(row) {
+  const s = row && row.softball;
+  return {
+    sport: 'Softball',
+    exists: !!row,
+    position: row ? row.position : null,
+    stats: row ? row.stats : {},
+    battingAvg:    s ? s.battingAvg    : null,
+    homeToFirst:   s ? s.homeToFirst   : null,
+    pitchSpeedMph: s ? s.pitchSpeedMph : null,
+    era:           s ? s.era           : null,
+  };
+}
+
+async function loadSoftball(userId) {
+  return AthleteSport.findOne({
+    where: { userId, sport: 'Softball' },
+    include: [{ model: SoftballStats, as: 'softball' }],
+  });
+}
+
+// GET — any logged-in user can read (coaches view athletes).
+router.get('/:id/sports/softball', requireAuth, async (req, res) => {
+  try {
+    const athlete = await User.findByPk(req.params.id, { attributes: ['id', 'role'] });
+    if (!athlete || athlete.role !== 'athlete') {
+      return res.status(404).json({ error: 'Athlete not found' });
+    }
+    const row = await loadSoftball(athlete.id);
+    res.json(softballView(row));
+  } catch (error) {
+    console.error('GET softball failed:', error);
+    res.status(500).json({ error: 'Could not retrieve Softball details' });
+  }
+});
+
+// PATCH — athletes edit only their own. Creates the row on first save;
+// after that, only the fields sent change. null clears a stat.
+router.patch('/:id/sports/softball', requireAuth, requireSelf, async (req, res) => {
+  try {
+    const user = await User.findByPk(req.params.id);
+    if (!user || user.role !== 'athlete') {
+      return res.status(404).json({ error: 'Athlete not found' });
+    }
+    // sportsPlayed is the one place that says which sports someone plays.
+    if (!(user.sportsPlayed || []).includes('Softball')) {
+      return res.status(400).json({ error: 'Add Softball to your sports before saving Softball details' });
+    }
+
+    const { position, stats } = req.body;
+
+    // Position: must be a registry position; null or "" clears it.
+    let newPosition;
+    if (position !== undefined) {
+      if (position === null || position === '') {
+        newPosition = null;
+      } else if (!SOFTBALL.positions.includes(position)) {
+        return res.status(400).json({ error: `Unknown Softball position: ${position}` });
+      } else {
+        newPosition = position;
+      }
+    }
+
+    // Stats blob: must be a plain object if sent.
+    if (stats !== undefined && (stats === null || typeof stats !== 'object' || Array.isArray(stats))) {
+      return res.status(400).json({ error: 'stats must be an object' });
+    }
+
+    // Searchable stats: number, in range; null or "" clears.
+    const statChanges = {};
+    for (const [key, rule] of Object.entries(SOFTBALL.stats)) {
+      const v = req.body[key];
+      if (v === undefined) continue;
+      if (v === null || v === '') { statChanges[key] = null; continue; }
+      if (typeof v !== 'number' && typeof v !== 'string') {
+        return res.status(400).json({ error: `${key} must be a number` });
+      }
+      const n = Number(v);
+      if (!Number.isFinite(n)) {
+        return res.status(400).json({ error: `${key} must be a number` });
+      }
+      if (rule.integer && !Number.isInteger(n)) {
+        return res.status(400).json({ error: `${key} must be a whole number` });
+      }
+      if (n < rule.min || n > rule.max) {
+        return res.status(400).json({ error: `${key} must be between ${rule.min} and ${rule.max}` });
+      }
+      statChanges[key] = n;
+    }
+
+    // Both tables in one transaction: all or nothing.
+    await AthleteSport.sequelize.transaction(async (t) => {
+      const [row] = await AthleteSport.findOrCreate({
+        where: { userId: user.id, sport: 'Softball' },
+        transaction: t,
+      });
+      if (newPosition !== undefined) row.position = newPosition;
+      // JSONB needs a NEW object or Sequelize won't see the change.
+      if (stats !== undefined) row.stats = { ...(row.stats || {}), ...stats };
+      await row.save({ transaction: t });
+
+      const [ss] = await SoftballStats.findOrCreate({
+        where: { athleteSportId: row.id },
+        transaction: t,
+      });
+      ss.set(statChanges);
+      await ss.save({ transaction: t });
+    });
+
+    const fresh = await loadSoftball(user.id);
+    res.json(softballView(fresh));
+  } catch (error) {
+    console.error('PATCH softball failed:', error);
+    res.status(500).json({ error: 'Could not save Softball details' });
   }
 });
 
