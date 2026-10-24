@@ -83,7 +83,9 @@ def edit_on_the_field(user):
     cur_inch        = current_h_in % 12 if current_h_in else 0
     current_weight  = user.get("weightLbs") or 0
     current_status  = user.get("recruitingStatus") or "Uncommitted"
+    current_name    = user.get("name") or ""
     with st.form("edit_onfield_form"):
+        new_name = st.text_input("Name", value=current_name, max_chars=60)
         col1, col2 = st.columns(2)
         with col1:
                       # Open the dropdown on the athlete's current sport.
@@ -127,6 +129,12 @@ def edit_on_the_field(user):
 
     if saved:
         payload = {}
+        clean_name = new_name.strip()
+        if not clean_name:
+            st.warning("Name can't be blank.")
+            return
+        if clean_name != current_name:
+            payload["name"] = clean_name
         if new_primary != current_primary and new_primary != "— Select —":
             payload["primarySport"] = new_primary
         if new_pos != current_pos:
@@ -581,6 +589,16 @@ def upload_highlight(user):
         st.caption(f"Tier: **{tier}** — {current} highlights (unlimited).")
 
     title = st.text_input("Clip title", key="hl_title", placeholder="e.g. 40-yd dash")
+
+    # Which sport is this clip for? Only sports they play. Primary is picked first.
+    played = user.get("sportsPlayed") or []
+    primary = user.get("primarySport")
+    clip_sport = None
+    if played:
+        start = played.index(primary) if primary in played else 0
+        clip_sport = st.selectbox(
+            "Which sport is this clip for?", played, index=start, key="hl_sport"
+        )
     video_file = st.file_uploader(
         "Choose a video", type=["mp4", "mov", "webm"], key="hl_file"
     )
@@ -604,7 +622,7 @@ def upload_highlight(user):
             # ── Step 2: attach the clip to the athlete's highlights ──
             attach = _authpost(
                 f"{API_URL}/api/athletes/{aid}/highlights",
-                json={"title": title or "Untitled", "url": clip_url},
+                 json={"title": title or "Untitled", "url": clip_url, "sport": clip_sport},
             )
 
             # 403 = tier gate. Not an error — an upgrade moment.

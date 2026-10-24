@@ -244,7 +244,17 @@ router.patch('/:id', requireAuth, requireSelf, async (req, res) => {
 
     // ─── CATEGORY 1: scalar columns — assign only if provided ───
     // `!== undefined` (not a truthy check) so a deliberate "" or 0 still saves.
-    if (name           !== undefined) user.name           = name;
+      if (name !== undefined) {
+      // Trim spaces. A blank name would leave the card with no name.
+      const cleanName = typeof name === "string" ? name.trim() : "";
+      if (!cleanName) {
+        return res.status(400).json({ error: "Name can't be blank." });
+      }
+      if (cleanName.length > 60) {
+        return res.status(400).json({ error: "Name must be 60 characters or less." });
+      }
+      user.name = cleanName;
+    }
     if (primarySport   !== undefined) user.primarySport   = primarySport;
     if (position       !== undefined) user.position       = position;
     if (school         !== undefined) user.school         = school;
@@ -309,8 +319,9 @@ attachMediaRoutes(router, User, {
   base: 'highlights',
   countLimits: { basic: 2, premium: Infinity },
   durationLimits: { basic: 10, premium: Infinity },
-  clipExtra: {},
+    clipExtra: {},
   labels: { durationUnit: 'highlights', countLabel: 'Highlight', noun: 'highlight' },
+  sportField: true,   // highlights live with their sport card
 });
 
 // ==================================================================
