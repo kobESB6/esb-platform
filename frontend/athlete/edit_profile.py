@@ -83,7 +83,9 @@ def edit_on_the_field(user):
     cur_inch        = current_h_in % 12 if current_h_in else 0
     current_weight  = user.get("weightLbs") or 0
     current_status  = user.get("recruitingStatus") or "Uncommitted"
+    current_name    = user.get("name") or ""
     with st.form("edit_onfield_form"):
+        new_name = st.text_input("Name", value=current_name, max_chars=60)
         col1, col2 = st.columns(2)
         with col1:
                       # Open the dropdown on the athlete's current sport.
@@ -127,6 +129,12 @@ def edit_on_the_field(user):
 
     if saved:
         payload = {}
+        clean_name = new_name.strip()
+        if not clean_name:
+            st.warning("Name can't be blank.")
+            return
+        if clean_name != current_name:
+            payload["name"] = clean_name
         if new_primary != current_primary and new_primary != "— Select —":
             payload["primarySport"] = new_primary
         if new_pos != current_pos:
