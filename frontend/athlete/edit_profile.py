@@ -614,7 +614,7 @@ def upload_highlight(user):
             # ── Step 2: attach the clip to the athlete's highlights ──
             attach = _authpost(
                 f"{API_URL}/api/athletes/{aid}/highlights",
-                json={"title": title or "Untitled", "url": clip_url},
+                 json={"title": title or "Untitled", "url": clip_url, "sport": clip_sport},
             )
 
             # 403 = tier gate. Not an error — an upgrade moment.
