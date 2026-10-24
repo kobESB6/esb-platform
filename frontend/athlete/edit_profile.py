@@ -581,6 +581,16 @@ def upload_highlight(user):
         st.caption(f"Tier: **{tier}** — {current} highlights (unlimited).")
 
     title = st.text_input("Clip title", key="hl_title", placeholder="e.g. 40-yd dash")
+
+    # Which sport is this clip for? Only sports they play. Primary is picked first.
+    played = user.get("sportsPlayed") or []
+    primary = user.get("primarySport")
+    clip_sport = None
+    if played:
+        start = played.index(primary) if primary in played else 0
+        clip_sport = st.selectbox(
+            "Which sport is this clip for?", played, index=start, key="hl_sport"
+        )
     video_file = st.file_uploader(
         "Choose a video", type=["mp4", "mov", "webm"], key="hl_file"
     )

@@ -88,65 +88,94 @@ def show_athlete_dashboard():
         st.markdown(f"**Recruiting Status:** {recruiting_status}")
 
        # -- SPORT CARDS: one per sport the registry has a look for (Football now) --
-    card_sports = [s for s in sports_played if SPORT_REGISTRY.get(s, {}).get("look")]
+        card_sports = [s for s in sports_played if SPORT_REGISTRY.get(s, {}).get("look")]
+
+    # Group clips by sport. A clip with no sport, or a sport with no card,
+    # goes under the primary sport's card.
+    highlights = on_field.get("highlights", [])
+    home = user.get("primarySport") if user.get("primarySport") in card_sports else None
+    clips_by_sport = {s: [] for s in card_sports}
+    loose = []   # clips with no card to sit under
+    for clip in highlights:
+        s = clip.get("sport")
+        if s in clips_by_sport:
+            clips_by_sport[s].append(clip)
+        elif home:
+            clips_by_sport[home].append(clip)
+        else:
+            loose.append(clip)
+
+        # Clips store a RELATIVE url (/uploads/...); the backend serves them at
+    # MEDIA_BASE. Absolute URL so the player AND title link hit the API host.
+    def _full_url(url):
+        return url if url.startswith("http") else f"{MEDIA_BASE}{url}"
+
+    def _show_clip(clip):
+        url = clip.get("url", "")
+        title = clip.get("title", "Untitled")
+        full_url = _full_url(url)
+        edit_key = f"editing_{url}"
+        confirm_key = f"confirming_del_{url}"
+
+        # Title + ✏️ 🗑 in one row. The video plays on the card now.
+        col_title, col_edit, col_del = st.columns([4, 1, 1])
+        with col_title:
+            st.markdown(f"[{title}]({full_url})")
+        with col_edit:
+            if st.button("✏️", key=f"editbtn_{url}"):
+                st.session_state[edit_key] = True
+        with col_del:
+            if st.button("🗑", key=f"delbtn_{url}"):
+                st.session_state[confirm_key] = True
+
+        # Edit-title field. Appears when ✏️ is clicked.
+        if st.session_state.get(edit_key):
+            new_title = st.text_input("New title", value=title, key=f"newtitle_{url}")
+            c1, c2 = st.columns([1, 1])
+            with c1:
+                if st.button("Save", key=f"savetitle_{url}"):
+                    edit_highlight_title(user, url, new_title)
+            with c2:
+                if st.button("Cancel", key=f"canceltitle_{url}"):
+                    st.session_state[edit_key] = False
+                    st.rerun()
+
+        # Delete confirmation. Appears when 🗑 is clicked.
+        if st.session_state.get(confirm_key):
+            st.warning(f"Delete **{title}**? This can't be undone.")
+            c1, c2 = st.columns([1, 1])
+            with c1:
+                if st.button("Yes, delete", key=f"confirmdel_{url}"):
+                    delete_highlight(user, url)
+            with c2:
+                if st.button("Keep it", key=f"keepdel_{url}"):
+                    st.session_state[confirm_key] = False
+                    st.rerun()
+
     if card_sports:
         card_cols = st.columns(min(len(card_sports), 3))
         for i, sport in enumerate(card_sports):
             with card_cols[i % len(card_cols)]:
-                render_sport_card(sport, fetch_sport_row(user.get("id"), sport), user)
+                card_clips = [
+                    {"title": c.get("title", "Untitled"), "url": _full_url(c.get("url", ""))}
+                    for c in clips_by_sport[sport]
+                ]
+                render_sport_card(sport, fetch_sport_row(user.get("id"), sport), user, card_clips)
 
-    st.markdown("**🎥 Highlights**")
-    highlights = on_field.get("highlights", [])
-    if highlights:
-        for clip in highlights:
-            url = clip.get("url", "")
-            title = clip.get("title", "Untitled")
-            # Clips store a RELATIVE url (/uploads/...); the backend serves them at
-            # MEDIA_BASE. Absolute URL so the preview AND title link hit the API host.
-            full_url = url if url.startswith("http") else f"{MEDIA_BASE}{url}"
-            edit_key = f"editing_{url}"
-            confirm_key = f"confirming_del_{url}"
+    # Clips with no card to sit on (athlete has no sport cards yet).
+    if loose:
+        st.markdown("**🎥 Highlights**")
+        for clip in loose:
+            if clip.get("url"):
+                st.video(_full_url(clip["url"]))
 
-            thumb_col, body_col = st.columns([1, 3])
-            with thumb_col:
-                if url:
-                    st.video(full_url)   # poster frame = thumbnail; plays on click
-            with body_col:
-                col_title, col_edit, col_del = st.columns([6, 1, 1])
-                with col_title:
-                    st.markdown(f"[{title}]({full_url})")
-                with col_edit:
-                    if st.button("✏️", key=f"editbtn_{url}"):
-                        st.session_state[edit_key] = True
-                with col_del:
-                    if st.button("🗑", key=f"delbtn_{url}"):
-                        st.session_state[confirm_key] = True
-
-                # Edit-title field — appears when ✏️ clicked
-                if st.session_state.get(edit_key):
-                    new_title = st.text_input("New title", value=title, key=f"newtitle_{url}")
-                    c1, c2 = st.columns([1, 1])
-                    with c1:
-                        if st.button("Save", key=f"savetitle_{url}"):
-                            edit_highlight_title(user, url, new_title)
-                    with c2:
-                        if st.button("Cancel", key=f"canceltitle_{url}"):
-                            st.session_state[edit_key] = False
-                            st.rerun()
-
-                # Delete confirmation — appears when 🗑 clicked
-                if st.session_state.get(confirm_key):
-                    st.warning(f"Delete **{title}**? This can't be undone.")
-                    c1, c2 = st.columns([1, 1])
-                    with c1:
-                        if st.button("Yes, delete", key=f"confirmdel_{url}"):
-                            delete_highlight(user, url)
-                    with c2:
-                        if st.button("Keep it", key=f"keepdel_{url}"):
-                            st.session_state[confirm_key] = False
-                            st.rerun()
-    else:
+    if not highlights:
         st.info("No highlights added yet.")
+    else:
+        # Rename and delete live here, so the card stays clean for sharing.
+        with st.expander("⚙️ Manage highlights"):
+            for clip in highlights:
+                _show_clip(clip)
     with st.expander("🎥 Add Highlight"):
         upload_highlight(user)
 

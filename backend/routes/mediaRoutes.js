@@ -85,6 +85,7 @@ function attachMediaRoutes(router, User, cfg) {
     durationLimits = null,
     clipExtra = {},
     labels = {},
+    sportField = false,   // true = each clip gets a "sport" (one the user plays)
   } = cfg;
   const durationUnit = labels.durationUnit || "clips";
   const countLabel = labels.countLabel || "Media";
@@ -123,14 +124,32 @@ function attachMediaRoutes(router, User, cfg) {
       if (!user || user.role !== role) {
         return res.status(404).json({ error: `${cap(role)} not found` });
       }
-      const { title, url } = req.body;
+           const { title, url, sport } = req.body;
       if (!url) return res.status(400).json({ error: "url is required" });
 
+      // Sport tag (only when sportField is on). Must be a sport the user plays.
+      // None sent → primary sport, if they play it. Otherwise no tag.
+      let clipSport = null;
+      if (sportField) {
+        const played = user.sportsPlayed || [];
+        if (sport) {
+          if (!played.includes(sport)) {
+            return res.status(400).json({
+              error: `You don't play ${sport}. Pick one of: ${played.join(", ") || "none yet"}.`,
+            });
+          }
+          clipSport = sport;
+        } else if (played.includes(user.primarySport)) {
+          clipSport = user.primarySport;
+        }
+      }
+
       const clip = {
-        title: title || "Untitled",
+                title: (typeof title === "string" && title.trim()) || "Untitled",
         url,
         source: "upload",
         uploadedAt: new Date().toISOString(),
+        ...(sportField ? { sport: clipSport } : {}),
         ...clipExtra,
       };
 
@@ -199,7 +218,7 @@ function attachMediaRoutes(router, User, cfg) {
       const current = existing[field] || [];
       let found = false;
       const updated = current.map((clip) => {
-        if (clip.url === url) { found = true; return { ...clip, title: title || "Untitled" }; }
+                if (clip.url === url) { found = true; return { ...clip, title: (typeof title === "string" && title.trim()) || "Untitled" }; }
         return clip;
       });
       if (!found) return res.status(404).json({ error: `No ${noun} found with that url` });

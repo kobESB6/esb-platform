@@ -309,8 +309,9 @@ attachMediaRoutes(router, User, {
   base: 'highlights',
   countLimits: { basic: 2, premium: Infinity },
   durationLimits: { basic: 10, premium: Infinity },
-  clipExtra: {},
+    clipExtra: {},
   labels: { durationUnit: 'highlights', countLabel: 'Highlight', noun: 'highlight' },
+  sportField: true,   // highlights live with their sport card
 });
 
 // ==================================================================

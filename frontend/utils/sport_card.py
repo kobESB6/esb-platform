@@ -64,8 +64,10 @@ def _fmt(value, stat):
     return f"{shown} {stat['unit']}"
 
 
-def render_sport_card(sport, row, user):
-    """Draw one sport card. Skips sports the registry hasn't given a look yet."""
+def render_sport_card(sport, row, user, highlights=None):
+    """Draw one sport card. Skips sports the registry hasn't given a look yet.
+    highlights = list of {"title", "url"} with full URLs. Each one becomes a
+    ▶ title row on the card. The player stays hidden until the row is opened."""
     info = SPORT_REGISTRY.get(sport, {})
     look = info.get("look")
     if not look:
@@ -74,6 +76,19 @@ def render_sport_card(sport, row, user):
     e = html.escape
 
     star = "★ Primary" if user.get("primarySport") == sport else ""
+    # One row per highlight. Nothing shows when the sport has no clips.
+    # <details> opens and closes on its own, no code needed.
+    # preload="none" means the video doesn't load until it's opened.
+    chip = ""
+    for clip in highlights or []:
+        chip += (
+            '<details style="margin-top:8px;border:1px solid var(--t);'
+            'border-radius:10px;padding:4px 10px">'
+            f'<summary style="cursor:pointer;font-size:13px;font-weight:700">{e(clip["title"])}</summary>'
+            f'<video controls preload="none" src="{e(clip["url"])}" '
+            'style="width:100%;margin-top:6px;border-radius:6px"></video>'
+            '</details>'
+        )
     position = row.get("position") or "—"
     meta_bits = [b for b in [user.get("school"),
                              f"Class of {user['graduationYear']}" if user.get("graduationYear") else None] if b]
@@ -112,6 +127,7 @@ def render_sport_card(sport, row, user):
         f'<div class="esb-card-name">{e(user.get("name") or "")}</div>'
         f'<div class="esb-card-meta">{e(meta)}</div>'
         f'<div class="esb-card-stats">{stats_html}</div>'
+        f'{chip}'
         f'<div class="esb-card-foot">ESB · EAT SLEEP BREATHE SPORTS</div>'
         f'</div>'
     )
