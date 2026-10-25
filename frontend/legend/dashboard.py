@@ -87,7 +87,9 @@ def show_legend_dashboard():
             # Clips store a RELATIVE url (/uploads/...); the backend serves them
             # at MEDIA_BASE. Build an absolute URL so the inline preview AND the
             # title link resolve to the API host, not the Streamlit host.
-            full_url = url if url.startswith("http") else f"{MEDIA_BASE}{url}"
+                        # R2 clips arrive with a fresh signed playUrl (good for 1 hour).
+            # Old disk clips have no playUrl, so they still use MEDIA_BASE.
+            full_url = item.get("playUrl") or (url if url.startswith("http") else f"{MEDIA_BASE}{url}")
             edit_key = f"editing_media_{url}"
             confirm_key = f"confirming_del_media_{url}"
 

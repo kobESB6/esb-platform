@@ -6,6 +6,11 @@ const path = require("path");
 // Middleware — teaches Express to read JSON request bodies
 app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+// Stamp a fresh 1-hour playUrl on every R2 clip in every JSON response.
+// Must sit ABOVE the route lines so it sees their responses.
+const { signPlayUrls } = require("./utils/signPlayUrls");
+app.use(signPlayUrls);
 // Health check route — confirms server is alive
 app.get("/", (req, res) => {
   res.send("ESB Backend Running ✅");

@@ -107,7 +107,14 @@ def show_athlete_dashboard():
 
         # Clips store a RELATIVE url (/uploads/...); the backend serves them at
     # MEDIA_BASE. Absolute URL so the player AND title link hit the API host.
+        # R2 clips arrive with a fresh signed playUrl (good for 1 hour). Look it
+    # up by the clip's url (its name tag). Old disk clips have no playUrl,
+    # so they still use MEDIA_BASE.
+    _play = {c.get("url"): c.get("playUrl") for c in highlights if c.get("playUrl")}
+
     def _full_url(url):
+        if url in _play:
+            return _play[url]
         return url if url.startswith("http") else f"{MEDIA_BASE}{url}"
 
     def _show_clip(clip):

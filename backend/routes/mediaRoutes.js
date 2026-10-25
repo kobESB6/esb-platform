@@ -10,6 +10,7 @@ const path = require("path");
 const fs = require("fs");
 const { execFileSync } = require("child_process");
 const { requireAuth, requireSelf } = require('../middleware/auth');
+const { putVideo, deleteVideo } = require('../utils/r2');
 
 // ─── Video upload storage (shared on-disk dir + naming) ───
 const VIDEO_DIR = path.join(__dirname, "..", "uploads", "videos");
@@ -113,8 +114,18 @@ function attachMediaRoutes(router, User, cfg) {
         });
       }
     }
-    const url = `/uploads/videos/${req.file.filename}`;
-    res.json({ url, filename: req.file.filename, size: req.file.size, duration });
+        // Passed every check → send it to R2, then clear the temp copy off disk.
+    // The user's id is in the path so attach can confirm a clip is really theirs.
+    const key = `videos/${req.params.id}/${req.file.filename}`;
+    try {
+      await putVideo(req.file.path, key, req.file.mimetype);
+    } catch (err) {
+      console.error("R2 upload failed:", err);
+      safeUnlink(req.file.path);
+      return res.status(502).json({ error: "Could not save your video. Please try again." });
+    }
+    safeUnlink(req.file.path);
+    res.json({ url: `r2:${key}`, key, filename: req.file.filename, size: req.file.size, duration });
   });
 
   // POST /:id/<base> — append a clip object to onTheField[field].
@@ -125,7 +136,13 @@ function attachMediaRoutes(router, User, cfg) {
         return res.status(404).json({ error: `${cap(role)} not found` });
       }
            const { title, url, sport } = req.body;
-      if (!url) return res.status(400).json({ error: "url is required" });
+            if (!url) return res.status(400).json({ error: "url is required" });
+
+      // R2 clips must live in this user's own folder. Stops anyone from
+      // attaching someone else's clip and getting a play link for it.
+      if (typeof url === "string" && url.startsWith("r2:") && !url.startsWith(`r2:videos/${user.id}/`)) {
+        return res.status(403).json({ error: "That clip isn't yours." });
+      }
 
       // Sport tag (only when sportField is on). Must be a sport the user plays.
       // None sent → primary sport, if they play it. Otherwise no tag.
@@ -193,8 +210,17 @@ function attachMediaRoutes(router, User, cfg) {
       if (updated.length === current.length) {
         return res.status(404).json({ error: `No ${noun} found with that url` });
       }
-      user.onTheField = { ...existing, [field]: updated };
+            user.onTheField = { ...existing, [field]: updated };
       await user.save();
+
+      // Clip is off the profile. Now remove the video from R2 so we don't pay
+      // to store dead files. Best effort: if R2 fails, the profile is still
+      // right; we log the leftover so it can be cleaned up later.
+      if (typeof url === "string" && url.startsWith("r2:")) {
+        try { await deleteVideo(url.slice(3)); }
+        catch (e) { console.error(`R2 delete failed, leftover file: ${url}`, e); }
+      }
+
       const { password: _omit, ...safeUser } = user.toJSON();
       res.json(safeUser);
     } catch (err) {
