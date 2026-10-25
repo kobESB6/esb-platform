@@ -22,15 +22,20 @@ _CSS = (
     "font-family:sans-serif;margin-bottom:12px;box-sizing:border-box}"
     ".esb-card-top{display:flex;justify-content:space-between;font-size:12px;font-weight:700;"
     "letter-spacing:.12em;text-transform:uppercase}"
-    ".esb-card-pos{font-size:56px;font-weight:800;line-height:1;margin-top:10px}"
+    ".esb-card-pos{font-size:56px;font-weight:800;line-height:1;margin-top:10px;"
+    "height:56px;display:flex;align-items:center}"
     ".esb-card-name{font-size:22px;font-weight:700}"
     ".esb-card-meta{font-size:13px;opacity:.85}"
     ".esb-card-stats{margin-top:auto;display:grid;grid-template-columns:1fr 1fr;gap:8px}"
-    ".esb-card-stat{background:rgba(0,0,0,.25);border-radius:8px;padding:6px 8px}"
-    ".esb-card-stat b{display:block;font-size:20px}"
-    ".esb-card-stat span{font-size:11px;opacity:.85;text-transform:uppercase;letter-spacing:.05em}"
-        ".esb-card-pos.long{font-size:34px;margin-top:20px}"
+    ".esb-card-stat{background:rgba(0,0,0,.25);border-radius:8px;padding:6px 8px;min-width:0}"
+    ".esb-card-stat b{display:block;font-size:20px;white-space:nowrap}"
+    ".esb-card-stat span{display:block;font-size:11px;opacity:.85;text-transform:uppercase;"
+    "letter-spacing:.05em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}"
+    ".esb-card-pos.long{font-size:34px}"
     ".esb-card-more{grid-column:1/-1;font-size:11px;opacity:.85;text-align:center;letter-spacing:.05em}"
+        ".esb-card-clips{height:76px;overflow-y:auto}"
+    ".esb-card-clips:has(details[open]){height:auto;overflow:visible}"
+    ".esb-card-noclips{margin-top:8px;font-size:12px;opacity:.6;text-align:center}"
     ".esb-card-foot{font-size:10px;letter-spacing:.2em;opacity:.7;text-align:center;margin-top:8px}"
     "</style>"
 )
@@ -87,8 +92,13 @@ def render_sport_card(sport, row, user, highlights=None):
             f'<summary style="cursor:pointer;font-size:13px;font-weight:700">{e(clip["title"])}</summary>'
             f'<video controls preload="none" src="{e(clip["url"])}" '
             'style="width:100%;margin-top:6px;border-radius:6px"></video>'
-            '</details>'
+        '</details>'
         )
+    # Every card gets the same highlight slot so cards in a row match.
+    # No clips -> a faint note fills the slot instead of empty space.
+    if not chip:
+        chip = '<div class="esb-card-noclips">No highlights yet</div>'
+    chip = f'<div class="esb-card-clips">{chip}</div>'
     position = row.get("position") or "—"
     meta_bits = [b for b in [user.get("school"),
                              f"Class of {user['graduationYear']}" if user.get("graduationYear") else None] if b]
