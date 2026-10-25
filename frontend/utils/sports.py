@@ -71,7 +71,27 @@ SPORT_REGISTRY = {
         "look": {"color": "#F2C200", "text": "#1A1A1A", "icon": "🥎"},
         "slug": "softball",
     },
-    "Soccer":        {"positions": ["Goalkeeper", "Defender", "Midfielder", "Forward"]},
+        # Soccer: two stats for field players, two for keepers. All season totals.
+    #   goals       : goals scored
+    #   assists     : passes that set up a goal
+    #   saves       : shots stopped (keepers)
+    #   cleanSheets : games with zero goals allowed (keepers)
+    "Soccer": {
+        "positions": ["Goalkeeper", "Defender", "Midfielder", "Forward"],
+        "stats": [
+            {"key": "goals",       "label": "Goals",        "unit": "G",
+             "min": 0, "max": 100, "step": 1},
+            {"key": "assists",     "label": "Assists",      "unit": "A",
+             "min": 0, "max": 100, "step": 1},
+            {"key": "saves",       "label": "Saves",        "unit": "SV",
+             "min": 0, "max": 400, "step": 1},
+            {"key": "cleanSheets", "label": "Clean sheets", "unit": "CS",
+             "min": 0, "max": 40,  "step": 1},
+        ],
+        # Royal blue with white text, so it doesn't look like Football's green.
+        "look": {"color": "#1565C0", "text": "#FFFFFF", "icon": "⚽"},
+        "slug": "soccer",
+    },
     "Volleyball":    {"positions": ["Setter", "Outside Hitter", "Middle Blocker",
                                     "Opposite", "Libero"]},
     "Wrestling":     {"positions": ["106", "113", "120", "126", "132", "138", "145",

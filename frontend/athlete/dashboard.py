@@ -8,6 +8,7 @@ from athlete.edit_profile import (
      edit_on_the_field,
     edit_football,
     edit_softball,
+    edit_soccer,
     edit_track,
     edit_in_the_classroom,
     edit_off_the_field,
@@ -194,10 +195,15 @@ def show_athlete_dashboard():
         with st.expander("🏈 Edit Football"):
             edit_football(user)
 
-        # Softball section shows only for athletes who play Softball.
+    # Softball section shows only for athletes who play Softball.
     if "Softball" in (user.get("sportsPlayed") or []):
         with st.expander("🥎 Edit Softball"):
             edit_softball(user)
+
+    # Soccer section shows only for athletes who play Soccer.
+    if "Soccer" in (user.get("sportsPlayed") or []):
+        with st.expander("⚽ Edit Soccer"):
+            edit_soccer(user)
 
     # Track & Field section shows only for athletes who run Track.
     if "Track & Field" in (user.get("sportsPlayed") or []):

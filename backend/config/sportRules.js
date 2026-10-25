@@ -53,4 +53,17 @@ const SOFTBALL = {
   },
 };
 
-module.exports = { FOOTBALL, TRACK, SOFTBALL };
+// Soccer: positions + fixed stats, same pattern as Softball.
+// MUST MATCH the Soccer entry in frontend/utils/sports.py.
+// All season totals, so every stat must be a whole number.
+const SOCCER = {
+  positions: ['Goalkeeper', 'Defender', 'Midfielder', 'Forward'],
+  stats: {
+    goals:       { min: 0, max: 100, integer: true },
+    assists:     { min: 0, max: 100, integer: true },
+    saves:       { min: 0, max: 400, integer: true },
+    cleanSheets: { min: 0, max: 40,  integer: true },
+  },
+};
+
+module.exports = { FOOTBALL, TRACK, SOFTBALL, SOCCER };
