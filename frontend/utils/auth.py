@@ -3,6 +3,7 @@
 # Returns the matched user with their correct role attached
 import json
 import requests
+import time
 import streamlit as st
 import streamlit.components.v1 as components
 
@@ -106,12 +107,33 @@ def save_session_cookie():
         st.session_state.cookie_saved = True
 
 
+REFRESH_SECONDS =  45 * 60   # play links last 1 hour; refresh before they die
+
+
+def _refresh_user():
+    # Re-ask the backend for the user, which brings fresh video play links.
+    # Never logs anyone out: if it fails, keep the old user and try later.
+    try:
+        r = requests.get(f"{API_URL}/api/auth/me",
+                         headers={"Authorization": f"Bearer {st.session_state.token}"}, timeout=5)
+        if r.status_code == 200:
+            st.session_state.user = r.json()["user"]
+            print("Refreshed user (fresh play links)")
+    except Exception as e:
+        print(f"Refresh error: {e}")
+    st.session_state.user_fetched_at = time.time()
+
+
 def restore_session():
     # Called by RoleRouter before the Access Denied check.
     # After a refresh, session_state is empty but the browser still sends
     # the cookie. We ask the backend who that token belongs to and refill
     # the session. Returns True if the user is logged in.
     if st.session_state.get("logged_in"):
+        # First check starts the clock; after REFRESH_SECONDS, fetch fresh links.
+        fetched = st.session_state.setdefault("user_fetched_at", time.time())
+        if time.time() - fetched > REFRESH_SECONDS:
+            _refresh_user()
         return True
     if st.session_state.get("logged_out"):
         return False   # just logged out, so ignore the old cookie
