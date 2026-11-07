@@ -1,7 +1,7 @@
 // routes/auth.js — ROLE-AGNOSTIC password reset.
 // Operates on the single User model by EMAIL (unique across all roles), so
 // unlike login it does NOT filter by role.
-//   POST /api/auth/request-reset   -> mints a token, console-logs the link
+//   POST /api/auth/request-reset   -> mints a token, emails the link (utils/mailer.js)
 //   POST /api/auth/reset-password  -> verifies token, writes a new password hash
 // Token is hashed at rest, 1h expiry, single-use. request-reset is enumeration-safe.
 

@@ -20,8 +20,9 @@ app.get("/", (req, res) => {
 const coachRoutes = require("./routes/coaches");
 // Mount athlete routes — any request to /api/athletes gets handled here
 const athleteRoutes = require("./routes/athletes");
-// Mount matching routes — any request to /api/matching gets handled here
-const matchingRoutes = require("./routes/matching");
+// Matching route UNPLUGGED for beta (Nov 2026). It used a paid AI key and the
+// old athletes.json file. Real matching will come from ESB's own model later.
+// const matchingRoutes = require("./routes/matching");
 // Mount legends route - any request to /api/legends gets handled here 
 const legendRoutes = require('./routes/legends');
 // Mount auth routes — password reset lives here, role-agnostic
@@ -29,7 +30,7 @@ const authRoutes = require('./routes/auth');
 
 app.use("/api/coaches", coachRoutes);
 app.use("/api/athletes", athleteRoutes);
-app.use("/api/matching", matchingRoutes);
+// app.use("/api/matching", matchingRoutes);
 app.use('/api/legends', legendRoutes);
 app.use('/api/auth', authRoutes);
 
