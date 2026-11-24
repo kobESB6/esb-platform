@@ -1,7 +1,7 @@
 import streamlit as st
 import time
 from utils.auth import create_user, authenticate
-from utils.sports import SPORTS as SPORTS_LIST
+from utils.sports import SPORTS as SPORTS_LIST, POSITIONS_BY_SPORT
 
 st.set_page_config(page_title="Join ESB", layout="centered")
 
@@ -62,7 +62,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- Signup Form UI ---
-st.markdown('<div class="form-container">', unsafe_allow_html=True)
+
 st.markdown('<div class="form-title">Create Your ESB Account</div>', unsafe_allow_html=True)
 
 # .strip() removes spaces at the start and end, so "  Big C  " saves as "Big C".
@@ -76,7 +76,14 @@ password = st.text_input("Password", type="password")
 extra = {}
 if role == "Athlete":
     extra["primarySport"] = st.selectbox("Primary Sport", SPORTS)
-    extra["position"] = st.text_input("Position")
+    # Position comes from the sport registry, so it always matches the sport card.
+    # Track & Field uses events, not positions (those are picked in the Track editor).
+    if extra["primarySport"] == "Track & Field":
+        sport_positions = []
+    else:
+        sport_positions = POSITIONS_BY_SPORT.get(extra["primarySport"], [])
+    if sport_positions:
+        extra["position"] = st.selectbox("Position (optional)", ["— Select —"] + sport_positions)
     extra["school"] = st.text_input("School")
     extra["graduationYear"] = st.number_input(
         "Graduation Year", min_value=2024, max_value=2035, value=2027, step=1
@@ -103,6 +110,9 @@ if st.button("Sign Up", key="signup_button"):
         st.warning("Please fill in all fields for your role.")
     else:
         # create_user returns (user, error). error tells us WHY it failed.
+                # Position is optional: never save the "— Select —" placeholder.
+        if extra.get("position") == "— Select —":
+            extra.pop("position")
         created, error = create_user(username, password, name, role.lower(), extra)
         if created:
             # Log the new account in exactly like Login.py does,
@@ -122,7 +132,7 @@ if st.button("Sign Up", key="signup_button"):
             st.error("An account with this email already exists. Try logging in instead.")
         else:
             st.error("Something went wrong creating your account. Please try again.")
-st.markdown('</div>', unsafe_allow_html=True)
+
 
 # --- Login redirect button ---
 if st.button("Already have an account? Log in here"):

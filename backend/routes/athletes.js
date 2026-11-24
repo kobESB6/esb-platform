@@ -51,13 +51,13 @@ router.post('/register', async (req, res) => {
        // Required = identity + searchable essentials only (Option B, Aug 29 2026).
     // gpa/height/weight deferred to profile-completion — lowers signup barrier
     // for overlooked HS athletes. FLAGGED: revisit if completion/search-quality data warrants.
-    if (!name || !email || !password || !primarySport || !position ||
+        // Position is optional: some sports (Track & Field) have none.
+    if (!name || !email || !password || !primarySport ||
         !school || !graduationYear) {
       return res.status(400).json({
-        error: 'name, email, password, primarySport, position, school, and graduationYear are required'
+        error: 'name, email, password, primarySport, school, and graduationYear are required'
       });
     }
-
     // Friendly duplicate check (the UNIQUE constraint is the real backstop)
     // Normalize email so stored + looked-up values always match
     const cleanEmail = email.trim().toLowerCase();
@@ -141,6 +141,22 @@ router.post('/register', async (req, res) => {
       linkedProfiles: [],
       progression: createProgression('athlete')
     });
+
+    // Put the signup position on the sport card too (athlete_sports),
+    // only for sports with a card table and a real registry position.
+    // If this fails, signup still succeeds; the editor can set it later.
+    try {
+      const CARD_SPORTS = { Football: FOOTBALL, Softball: SOFTBALL, Soccer: SOCCER };
+      const cardSport = CARD_SPORTS[primarySport];
+      if (cardSport && position && cardSport.positions.includes(position)) {
+        await AthleteSport.findOrCreate({
+          where: { userId: newAthlete.id, sport: primarySport },
+          defaults: { position },
+        });
+      }
+    } catch (cardErr) {
+      console.error('signup card position error:', cardErr);
+    }
 
     // Never send the password back
     const { password: _, ...athleteWithoutPassword } = newAthlete.toJSON();
