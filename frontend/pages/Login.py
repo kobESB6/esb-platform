@@ -49,17 +49,24 @@ if st.button("Log In", key="login_button"):
         st.error("Invalid username or password.")
 
 
-# --- Forgot password ---
-with st.expander("Forgot password?"):
-    reset_email = st.text_input("Enter your account email", key="reset_email")
-    if st.button("Send reset link", key="send_reset"):
-        try:
-            r = requests.post(
-                f"{API_BASE}/api/auth/request-reset",
-                json={"email": reset_email}
-            )
-            # Enumeration-safe: same message regardless of whether the email exists.
-            st.info(r.json().get("message",
-                "If an account exists, a reset link has been generated."))
-        except Exception as e:
-            st.error(f"Could not reach the server: {e}")
+# --- Forgot password + way back home, side by side ---
+col_reset, col_home, _ = st.columns([1, 1, 2])
+
+with col_reset:
+    with st.popover("Forgot password?"):
+        reset_email = st.text_input("Enter your account email", key="reset_email")
+        if st.button("Send reset link", key="send_reset"):
+            try:
+                r = requests.post(
+                    f"{API_BASE}/api/auth/request-reset",
+                    json={"email": reset_email}
+                )
+                # Enumeration-safe: same message regardless of whether the email exists.
+                st.info(r.json().get("message",
+                    "If an account exists, a reset link has been generated."))
+            except Exception as e:
+                st.error(f"Could not reach the server: {e}")
+
+with col_home:
+    if st.button("← Back to Home", key="back_home"):
+        st.switch_page("main.py")
