@@ -31,7 +31,7 @@ def show_legend_dashboard():
 
     # ── Page Header ───────────────────────────────────────────────
     st.title("🏆 Legend Dashboard")
-    st.markdown(f"Welcome back, **{user_name}**!")
+    st.markdown(f"Welcome back, **{(user_name or '').strip()}**!")
     st.markdown("*Providing Knowledge · Cultivating Passion · Advocates for Life*")
     st.markdown("---")
 
