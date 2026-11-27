@@ -9,6 +9,7 @@ const User = require('../models/User');   // ← replaces fs/path/JSON helpers
 const { sanitizeUser } = require('../utils/sanitizeUser');
 const { deepMerge } = require('../utils/deepMerge');
 const { signToken, requireAuth, requireSelf } = require('../middleware/auth');
+const { cleanProfile } = require('../utils/publicProfile');
 const AthleteSport  = require('../models/AthleteSport');
 const FootballStats = require('../models/FootballStats');
 const TrackMark     = require('../models/TrackMark');
@@ -211,7 +212,10 @@ router.get('/', requireAuth, async (req, res) => {
       where: { role: 'athlete' },
       attributes: { exclude: ['password'] }   // DB-level password exclusion
     });
-    res.json(athletes);
+    const viewer = await User.findByPk(req.auth.userId, {
+      attributes: ['id', 'role', 'isVerified']
+    });
+    res.json(athletes.map(a => cleanProfile(a, viewer)));
   } catch (error) {
     res.status(500).json({ error: 'Could not retrieve athletes' });
   }
@@ -223,10 +227,14 @@ router.get('/:id', requireAuth, async (req, res) => {
     const athlete = await User.findByPk(req.params.id, {
       attributes: { exclude: ['password'] }
     });
-    if (!athlete || athlete.role !== 'athlete') {
+      if (!athlete || athlete.role !== 'athlete') {
       return res.status(404).json({ error: 'Athlete not found' });
     }
-    res.json(athlete);
+    // Who is looking? Fresh from the DB so a revoked coach loses access right away.
+    const viewer = await User.findByPk(req.auth.userId, {
+      attributes: ['id', 'role', 'isVerified']
+    });
+    res.json(cleanProfile(athlete, viewer));
   } catch (error) {
     res.status(500).json({ error: 'Could not retrieve athlete' });
   }

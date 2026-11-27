@@ -9,6 +9,7 @@ const { v4: uuidv4 } = require('uuid');
 const User = require('../models/User');   // replaces fs/path/JSON helpers
 const { sanitizeUser } = require('../utils/sanitizeUser');
 const { signToken, requireAuth, requireSelf } = require('../middleware/auth');
+const { cleanProfile } = require('../utils/publicProfile');
 
 // Progression engine — unchanged
 function createProgression(role) {
@@ -207,7 +208,10 @@ router.get('/', requireAuth, async (req, res) => {
       where: { role: 'coach' },
       attributes: { exclude: ['password'] }
     });
-    res.json(coaches);
+      const viewer = await User.findByPk(req.auth.userId, {
+      attributes: ['id', 'role', 'isVerified']
+    });
+    res.json(coaches.map(c => cleanProfile(c, viewer)));
   } catch (error) {
     res.status(500).json({ error: 'Could not retrieve coaches' });
   }
@@ -222,7 +226,10 @@ router.get('/:id', requireAuth, async (req, res) => {
     if (!coach || coach.role !== 'coach') {
       return res.status(404).json({ error: 'Coach not found' });
     }
-    res.json(coach);
+      const viewer = await User.findByPk(req.auth.userId, {
+      attributes: ['id', 'role', 'isVerified']
+    });
+    res.json(cleanProfile(coach, viewer));
   } catch (error) {
     res.status(500).json({ error: 'Could not retrieve coach' });
   }

@@ -8,6 +8,7 @@ const User = require('../models/User');   // ← replaces fs/path/JSON helpers
 const { sanitizeUser } = require('../utils/sanitizeUser');
 const { deepMerge } = require('../utils/deepMerge');
 const { signToken, requireAuth, requireSelf } = require('../middleware/auth');
+const { cleanProfile } = require('../utils/publicProfile');
 const { attachMediaRoutes } = require('./mediaRoutes');
 // Progression engine — role-specific starting rank
 function createProgression(role) {
@@ -152,7 +153,10 @@ router.get('/', requireAuth, async (req, res) => {
       where: { role: 'legend' },
       attributes: { exclude: ['password'] }
     });
-    res.json(legends);
+      const viewer = await User.findByPk(req.auth.userId, {
+      attributes: ['id', 'role', 'isVerified']
+    });
+    res.json(legends.map(l => cleanProfile(l, viewer)));;
   } catch (error) {
     res.status(500).json({ error: 'Could not retrieve legends' });
   }
@@ -167,7 +171,10 @@ router.get('/:id', requireAuth, async (req, res) => {
     if (!legend || legend.role !== 'legend') {
       return res.status(404).json({ error: 'Legend not found' });
     }
-    res.json(legend);
+      const viewer = await User.findByPk(req.auth.userId, {
+      attributes: ['id', 'role', 'isVerified']
+    });
+    res.json(cleanProfile(legend, viewer));
   } catch (error) {
     res.status(500).json({ error: 'Could not retrieve legend' });
   }
