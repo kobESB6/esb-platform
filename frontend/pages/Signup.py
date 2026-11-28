@@ -86,7 +86,7 @@ if role == "Athlete":
         extra["position"] = st.selectbox("Position (optional)", ["— Select —"] + sport_positions)
     extra["school"] = st.text_input("School")
     extra["graduationYear"] = st.number_input(
-        "Graduation Year", min_value=2024, max_value=2035, value=2027, step=1
+        "Graduation Year", min_value=1900, max_value=2035, value=2027, step=1
     )
 elif role == "Coach":
     extra["school"] = st.text_input("School / Organization")

@@ -96,7 +96,7 @@ def edit_on_the_field(user):
             # Legends graduated in the past — range runs backward, not forward.
             new_grad  = st.number_input("Graduation year",
                                         value=int(current_grad) if current_grad else 2010,
-                                        min_value=1950, max_value=2035, step=1)
+                                        min_value=1900, max_value=2035, step=1)
                         # One box handles adding AND removing other sports.
             # The sportsPlayed column is the only source of truth (no blob fallback).
             current_sports = user.get("sportsPlayed") or []
