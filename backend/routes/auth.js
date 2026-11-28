@@ -10,6 +10,7 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const User = require('../models/User');
+const { passwordProblem } = require('../utils/password');
 const { sendEmail } = require('../utils/mailer');
 const { requireAuth } = require('../middleware/auth');
 const { sanitizeUser } = require('../utils/sanitizeUser');
@@ -70,8 +71,9 @@ router.post('/reset-password', async (req, res) => {
     if (!email || !token || !newPassword) {
       return res.status(400).json({ error: 'email, token, and newPassword are required' });
     }
-    if (newPassword.length < 8) {
-      return res.status(400).json({ error: 'New password must be at least 8 characters' });
+    const pwError = passwordProblem(newPassword);
+    if (pwError) {
+      return res.status(400).json({ error: pwError });
     }
 
     const cleanEmail = email.trim().toLowerCase();

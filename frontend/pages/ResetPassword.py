@@ -37,8 +37,8 @@ if st.button("Set New Password"):
         st.error("Please fill in both password fields.")
     elif new_password != confirm_password:
         st.error("Passwords do not match.")
-    elif len(new_password) < 8:
-        st.error("Password must be at least 8 characters.")
+    elif len(new_password) < 15:
+        st.error("Password must be at least 15 characters. A short phrase works great.")
     else:
         try:
             resp = requests.post(

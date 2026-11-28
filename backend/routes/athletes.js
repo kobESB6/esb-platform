@@ -5,7 +5,8 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcrypt');
-const User = require('../models/User');   // ← replaces fs/path/JSON helpers
+const User = require('../models/User');
+const { passwordProblem } = require('../utils/password');
 const { sanitizeUser } = require('../utils/sanitizeUser');
 const { deepMerge } = require('../utils/deepMerge');
 const { signToken, requireAuth, requireSelf } = require('../middleware/auth');
@@ -66,7 +67,10 @@ router.post('/register', async (req, res) => {
     if (existing) {
       return res.status(409).json({ error: 'Email already registered' });
     }
-
+    const pwError = passwordProblem(password);
+    if (pwError) {
+      return res.status(400).json({ error: pwError });
+    }
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // CREATE — promoted fields at top level (→ columns), full bodies in JSONB

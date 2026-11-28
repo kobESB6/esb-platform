@@ -6,7 +6,8 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcrypt');
 const { v4: uuidv4 } = require('uuid');
-const User = require('../models/User');   // replaces fs/path/JSON helpers
+const User = require('../models/User');
+const { passwordProblem } = require('../utils/password');
 const { sanitizeUser } = require('../utils/sanitizeUser');
 const { signToken, requireAuth, requireSelf } = require('../middleware/auth');
 const { cleanProfile } = require('../utils/publicProfile');
@@ -145,6 +146,10 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({
         error: 'name, email, password, school, sport, and coachType are required'
       });
+    }
+        const pwError = passwordProblem(password);
+    if (pwError) {
+      return res.status(400).json({ error: pwError });
     }
     if (!['highschool', 'college'].includes(coachType)) {
       return res.status(400).json({ error: 'coachType must be either highschool or college' });

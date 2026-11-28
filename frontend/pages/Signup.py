@@ -71,6 +71,7 @@ name = st.text_input("Full Name").strip()
 username = st.text_input("Email or Username").strip()   # " marcus@esb.com " → "marcus@esb.com"
 role = st.selectbox("Choose a Role", ["Athlete", "Coach", "Legend"])
 password = st.text_input("Password", type="password")
+st.caption("At least 15 characters. A short phrase works great, like: turkey day champs 1995")
 
 # --- Role-specific fields (Signature A: the form owns role-shape) ---
 extra = {}
@@ -107,7 +108,9 @@ if st.button("Sign Up", key="signup_button"):
         st.warning("Please select a sport.")
     # Role-specific text fields must be non-empty
     elif any(isinstance(v, str) and not v.strip() for v in extra.values()):
-        st.warning("Please fill in all fields for your role.")
+               st.warning("Please fill in all fields for your role.")
+    elif len(password) < 15:
+        st.warning("Password must be at least 15 characters. A short phrase works great.")
     else:
         # create_user returns (user, error). error tells us WHY it failed.
                 # Position is optional: never save the "— Select —" placeholder.

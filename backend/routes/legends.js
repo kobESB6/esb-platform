@@ -4,7 +4,8 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcrypt');
-const User = require('../models/User');   // ← replaces fs/path/JSON helpers
+const User = require('../models/User');
+const { passwordProblem } = require('../utils/password');
 const { sanitizeUser } = require('../utils/sanitizeUser');
 const { deepMerge } = require('../utils/deepMerge');
 const { signToken, requireAuth, requireSelf } = require('../middleware/auth');
@@ -41,6 +42,10 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({
         error: 'name, email, password, and primarySport are required'
       });
+    }
+    const pwError = passwordProblem(password);
+    if (pwError) {
+      return res.status(400).json({ error: pwError });
     }
     const cleanEmail = email.trim().toLowerCase();
     const existing = await User.findOne({ where: { email: cleanEmail } });
