@@ -27,8 +27,8 @@ _CSS = (
     ".esb-card-name{font-size:22px;font-weight:700}"
     ".esb-card-meta{font-size:13px;opacity:.85}"
     ".esb-card-stats{margin-top:auto;display:grid;grid-template-columns:1fr 1fr;gap:8px}"
-    ".esb-card-stat{background:rgba(0,0,0,.25);border-radius:8px;padding:6px 8px;min-width:0}"
-    ".esb-card-stat b{display:block;font-size:20px;white-space:nowrap}"
+        ".esb-card-stat{background:rgba(0,0,0,.25);border-radius:8px;padding:6px 8px;min-width:0;container-type:inline-size}"
+    ".esb-card-stat b{display:block;font-size:clamp(13px,11cqi,20px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}"
     ".esb-card-stat span{display:block;font-size:11px;opacity:.85;text-transform:uppercase;"
     "letter-spacing:.05em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}"
     ".esb-card-pos.long{font-size:34px}"
@@ -121,7 +121,16 @@ def render_sport_card(sport, row, user, highlights=None):
         )
         extra = len(shown) - 4
         if extra > 0:
-            stats_html += f'<div class="esb-card-more">+{extra} more event{"s" if extra > 1 else ""}</div>'
+            # Click "+N more events" to see the rest of the marks (Track only).
+            more_rows = "".join(
+                f'<div style="margin-top:4px">{e(ev["name"])}: '
+                f'{e(format_mark(ev["kind"], marks[ev["name"]]))}</div>'
+                for ev in shown[4:]
+            )
+            stats_html += (
+                f'<details class="esb-card-more"><summary style="cursor:pointer">'
+                f'+{extra} more event{"s" if extra > 1 else ""}</summary>{more_rows}</details>'
+            )
     else:
         stats_html = "".join(
             f'<div class="esb-card-stat"><b>{e(_fmt(row.get(s["key"]), s))}</b>'
